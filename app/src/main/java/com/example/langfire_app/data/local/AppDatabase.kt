@@ -2,6 +2,7 @@ package com.example.langfire_app.data.local
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import com.example.langfire_app.data.local.dao.*
 import com.example.langfire_app.data.local.entities.*
 
 @Database(
@@ -24,8 +25,10 @@ import com.example.langfire_app.data.local.entities.*
 )
 abstract class AppDatabase : RoomDatabase() {
 
-    // Registration of DAO
-//    abstract fun profileDao(): ProfileDao
-//    abstract fun wordsDao(): WordsDao
-
+    // Registration of DAOs
+    abstract fun profileDao(): ProfileDao
+    abstract fun behaviorDao(): BehaviorDao
+    abstract fun ruleDao(): RuleDao
+    abstract fun achievementDao(): AchievementDao
+    abstract fun wordProgressDao(): WordProgressDao
 }

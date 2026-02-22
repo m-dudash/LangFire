@@ -9,7 +9,7 @@ import androidx.room.PrimaryKey
     tableName = "word_progress",
     foreignKeys = [
         ForeignKey(entity = ProfileEntity::class, parentColumns = ["id"], childColumns = ["profile_id"]),
-        ForeignKey(entity = WordsEntity::class, parentColumns = ["id"], childColumns = ["dutch_word_id"])
+        ForeignKey(entity = WordsEntity::class, parentColumns = ["id"], childColumns = ["word_id"])
     ]
 )
 data class WordProgressEntity(
@@ -19,5 +19,5 @@ data class WordProgressEntity(
     @ColumnInfo(name = "correct_count") val correctCount: Int?,
     @ColumnInfo(name = "incorrect_count") val incorrectCount: Int?,
     @ColumnInfo(name = "profile_id") val profileId: Int,
-    @ColumnInfo(name = "dutch_word_id") val dutchWordId: Int
+    @ColumnInfo(name = "word_id") val wordId: Int
 )
