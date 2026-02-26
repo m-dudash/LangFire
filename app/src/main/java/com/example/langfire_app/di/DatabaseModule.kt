@@ -3,6 +3,7 @@ package com.example.langfire_app.di
 import android.content.Context
 import androidx.room.Room
 import com.example.langfire_app.data.local.AppDatabase
+import com.example.langfire_app.data.local.DatabaseCallback
 import com.example.langfire_app.data.local.dao.*
 import com.example.langfire_app.data.repository.*
 import com.example.langfire_app.domain.repository.*
@@ -20,12 +21,18 @@ object DatabaseModule {
 
     @Provides
     @Singleton
-    fun provideDatabase(@ApplicationContext context: Context): AppDatabase {
+    fun provideDatabase(
+        @ApplicationContext context: Context,
+        callback: DatabaseCallback
+    ): AppDatabase {
         return Room.databaseBuilder(
             context,
             AppDatabase::class.java,
             "langfire_db"
-        ).build()
+        )
+            .fallbackToDestructiveMigration()
+            .addCallback(callback)
+            .build()
     }
 
     @Provides
@@ -42,6 +49,17 @@ object DatabaseModule {
 
     @Provides
     fun provideWordProgressDao(db: AppDatabase): WordProgressDao = db.wordProgressDao()
+
+    @Provides
+    fun provideCourseDao(db: AppDatabase): CourseDao {
+        return db.courseDao()
+    }
+
+    @Provides
+    fun provideAppSettingsDao(db: AppDatabase): AppSettingsDao {
+        return db.appSettingsDao()
+    }
+
 }
 
 /**

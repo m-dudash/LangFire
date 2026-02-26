@@ -18,9 +18,11 @@ import com.example.langfire_app.data.local.entities.*
         WordProgressEntity::class,
         BehaviorEntity::class,
         AchievementEntity::class,
-        RuleEntity::class
+        RuleEntity::class,
+        CourseEntity::class,
+        AppSettingEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -31,4 +33,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun ruleDao(): RuleDao
     abstract fun achievementDao(): AchievementDao
     abstract fun wordProgressDao(): WordProgressDao
+    abstract fun courseDao(): CourseDao
+    abstract fun appSettingsDao(): AppSettingsDao
 }
