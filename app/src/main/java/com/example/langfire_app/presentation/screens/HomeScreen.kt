@@ -2,10 +2,17 @@ package com.example.langfire_app.presentation.screens
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.LibraryBooks
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Whatshot
@@ -13,6 +20,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
@@ -27,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.langfire_app.domain.model.Course
 import com.example.langfire_app.presentation.ui.theme.*
 import com.example.langfire_app.presentation.viewmodels.HomeViewModel
 import kotlin.math.cos
@@ -36,13 +45,14 @@ import androidx.compose.foundation.background
 // ─────────────────────────────────────────────────────────────────────────────
 // HOME SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
     onLibraryClick: () -> Unit = {},
     onBurnClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
-    onLanguageClick: () -> Unit = {},
+    onLanguageClick: () -> Unit = {},   // kept for external callers; picker is handled internally
     onFortuneClick: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -56,6 +66,9 @@ fun HomeScreen(
             Toast.makeText(context, "First, create a profile in the Profile section!", Toast.LENGTH_SHORT).show()
         }
     }
+
+    // ── Language-picker sheet state ─────────────────────────────────
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     if (state.isLoading) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -82,11 +95,12 @@ fun HomeScreen(
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             TopBar(
-                languageFlag = state.languageFlag,
-                languageName = state.languageName,
+                languageFlag  = state.languageFlag,
+                languageName  = state.languageName,
                 languageLevel = state.languageLevel,
-                xp = state.xp,
-                onLanguageClick = { requireProfile(onLanguageClick) }            )
+                xp            = state.xp,
+                onLanguageClick = { requireProfile { viewModel.showLanguagePicker() } }
+            )
 
             Box(
                 modifier = Modifier
@@ -150,11 +164,132 @@ fun HomeScreen(
             }
         }
     }
+
+    // ── Language Picker Bottom Sheet ──────────────────────────────────
+    if (state.showLanguagePicker) {
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.hideLanguagePicker() },
+            sheetState       = sheetState,
+            containerColor   = MaterialTheme.colorScheme.surface,
+            dragHandle       = { BottomSheetDefaults.DragHandle() }
+        ) {
+            LanguageSwitcherSheet(
+                courses        = state.availableCourses,
+                activeCourseId = state.activeCourseId,
+                onSelect       = { viewModel.selectCourse(it) }
+            )
+        }
+    }
 }
 
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TOP BAR
+// ───────────────────────────────────────────────────────────────────
+// LANGUAGE SWITCHER BOTTOM SHEET
+// ───────────────────────────────────────────────────────────────────
+@Composable
+private fun LanguageSwitcherSheet(
+    courses: List<Course>,
+    activeCourseId: Int?,
+    onSelect: (Int) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .padding(bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Sheet title
+        Text(
+            text  = "Choose Language",
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+        )
+
+        if (courses.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxWidth().height(120.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text  = "No courses available",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            LazyVerticalGrid(
+                columns             = GridCells.Fixed(2),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement   = Arrangement.spacedBy(12.dp),
+                modifier            = Modifier.fillMaxWidth()
+            ) {
+                items(courses) { course ->
+                    CoursePickerCard(
+                        course     = course,
+                        isSelected = course.id == activeCourseId,
+                        onClick    = { onSelect(course.id) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CoursePickerCard(
+    course: Course,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val borderColor = if (isSelected) FireOrange else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+    val bgColor     = if (isSelected)
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+    else
+        MaterialTheme.colorScheme.surfaceVariant
+
+    Surface(
+        onClick   = onClick,
+        shape     = RoundedCornerShape(18.dp),
+        color     = bgColor,
+        border    = androidx.compose.foundation.BorderStroke(if (isSelected) 2.dp else 1.dp, borderColor),
+        tonalElevation = if (isSelected) 4.dp else 0.dp,
+        modifier  = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment    = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(text = course.icon, fontSize = 28.sp)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text  = course.name,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2
+                )
+                Text(
+                    text  = course.targetLang.uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    letterSpacing = 0.5.sp
+                )
+            }
+            if (isSelected) {
+                Icon(
+                    imageVector  = Icons.Default.Check,
+                    contentDescription = null,
+                    tint    = FireOrange,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun TopBar(

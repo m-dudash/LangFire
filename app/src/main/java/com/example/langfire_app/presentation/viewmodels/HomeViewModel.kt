@@ -2,11 +2,11 @@ package com.example.langfire_app.presentation.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.langfire_app.domain.model.Course
 import com.example.langfire_app.domain.repository.CourseRepository
 import com.example.langfire_app.domain.repository.SettingsRepository
 import com.example.langfire_app.domain.usecase.GetProfileUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,33 +39,61 @@ class HomeViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         hasActiveProfile = true,
-                        isLoading = false,
                         streakDays = profile.streakDays,
                         xp = profile.xp,
                     )
                 }
             } else {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        hasActiveProfile = false
-                    )
-                }
+                _uiState.update { it.copy(hasActiveProfile = false) }
             }
 
-
+            // ── Load courses ──────────────────────────────────────────────
+            val allCourses   = courseRepository.getAllCourses()
             val savedCourseId = settingsRepository.getCurrentCourseId()
 
-            val activeCourse = if (savedCourseId != null) {
-                courseRepository.getCourseById(savedCourseId)
-                    ?: courseRepository.getAllCourses().firstOrNull()
-            } else {
-                val firstCourse = courseRepository.getAllCourses().firstOrNull()
-                firstCourse?.let { settingsRepository.setCurrentCourseId(it.id) }
-                firstCourse
+            val activeCourse: Course? = when {
+                savedCourseId != null ->
+                    courseRepository.getCourseById(savedCourseId)
+                        ?: allCourses.firstOrNull()
+                allCourses.isNotEmpty() -> {
+                    val first = allCourses.first()
+                    settingsRepository.setCurrentCourseId(first.id)
+                    first
+                }
+                else -> null
+            }
+
+            _uiState.update {
+                it.copy(
+                    isLoading        = false,
+                    availableCourses = allCourses,
+                    activeCourseId   = activeCourse?.id,
+                    languageName     = activeCourse?.name     ?: it.languageName,
+                    languageFlag     = activeCourse?.icon     ?: it.languageFlag,
+                    languageLevel    = it.languageLevel  // kept; can be wired to StatsRepo later
+                )
             }
         }
     }
+
+    /** Persist the selected course and update the top-bar immediately. */
+    fun selectCourse(courseId: Int) {
+        viewModelScope.launch {
+            settingsRepository.setCurrentCourseId(courseId)
+            val course = courseRepository.getCourseById(courseId)
+            _uiState.update {
+                it.copy(
+                    activeCourseId      = courseId,
+                    languageName        = course?.name ?: it.languageName,
+                    languageFlag        = course?.icon ?: it.languageFlag,
+                    showLanguagePicker  = false
+                )
+            }
+        }
+    }
+
+    fun showLanguagePicker() { _uiState.update { it.copy(showLanguagePicker = true)  } }
+    fun hideLanguagePicker() { _uiState.update { it.copy(showLanguagePicker = false) } }
 
     fun onBurnClick() {
         // Logic for burning/streak
@@ -73,7 +101,7 @@ class HomeViewModel @Inject constructor(
 }
 
 data class HomeUiState(
-    val isLoading: Boolean = false,
+    val isLoading: Boolean = true,
     val hasActiveProfile: Boolean = false,
     val streakDays: Int = 1,
     val xp: Int = 0,
@@ -81,5 +109,11 @@ data class HomeUiState(
     val learnedWordsGoal: Int = 100,
     val languageName: String = "Language",
     val languageFlag: String = "🏳️",
-    val languageLevel: String = "A1"
+    val languageLevel: String = "A1",
+    /** All courses available for the user to switch between. */
+    val availableCourses: List<Course> = emptyList(),
+    /** ID of the currently active course (used to highlight selection in picker). */
+    val activeCourseId: Int? = null,
+    /** Whether the language-picker bottom sheet should be visible. */
+    val showLanguagePicker: Boolean = false
 )
