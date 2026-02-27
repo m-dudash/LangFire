@@ -72,6 +72,8 @@ object EntityMappers {
         value = value,
         unlocked = unlocked,
         description = description,
+        icon = icon,
+        title = title,
         profileId = profileId
     )
 
@@ -81,6 +83,8 @@ object EntityMappers {
         value = value,
         unlocked = unlocked,
         description = description,
+        icon = icon,
+        title = title,
         profileId = profileId
     )
 

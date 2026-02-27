@@ -143,7 +143,10 @@ fun HomeScreen(
                     onClick = { requireProfile(onFortuneClick) }
                 )
 
-                FlameWithStreak(streakDays = state.streakDays)
+                FlameWithStreak(
+                    streakDays = state.streakDays,
+                    onClick = { requireProfile { viewModel.onBurnClick(); onBurnClick() } }
+                )
             }
         }
     }
@@ -277,7 +280,7 @@ private fun formatXp(xp: Int): String = if (xp >= 1000) {
 // FLAME  +  STREAK
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
-private fun FlameWithStreak(streakDays: Int) {
+private fun FlameWithStreak(streakDays: Int, onClick: () -> Unit = {}) {
     val isStreakBroken = streakDays == 0
 
     // If streak is valid, we animate. Otherwise, static.
@@ -303,6 +306,7 @@ private fun FlameWithStreak(streakDays: Int) {
         modifier = Modifier
             .width(260.dp)
             .height(340.dp)
+            .pointerInput(Unit) { detectTapGestures(onTap = { onClick() }) }
     ) {
         // Dynamic Flame Canvas
         Canvas(
@@ -629,15 +633,16 @@ private fun SmallProgressRing(
 // ─────────────────────────────────────────────────────────────────────────────
 // BOTTOM NAV
 // ─────────────────────────────────────────────────────────────────────────────
-private enum class NavTab { LIBRARY, BURN, PROFILE }
+internal enum class NavTab { LIBRARY, BURN, PROFILE }
 
 @Composable
-private fun LangFireBottomBar(
+internal fun LangFireBottomBar(
     onLibraryClick: () -> Unit,
     onBurnClick: () -> Unit,
     onProfileClick: () -> Unit,
+    initialSelected: NavTab = NavTab.BURN,
 ) {
-    var selected by remember { mutableStateOf(NavTab.BURN) }
+    var selected by remember { mutableStateOf(initialSelected) }
 
     Box(
         modifier = Modifier

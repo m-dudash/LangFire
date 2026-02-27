@@ -1,6 +1,7 @@
 package com.example.langfire_app.data.local.dao
 
 import androidx.room.*
+import com.example.langfire_app.data.local.entities.WordLevelProgress
 import com.example.langfire_app.data.local.entities.WordProgressEntity
 
 @Dao
@@ -29,4 +30,40 @@ interface WordProgressDao {
 
     @Query("DELETE FROM word_progress WHERE id = :id")
     suspend fun deleteById(id: Int)
+
+
+    @Query("""
+        SELECT w.word
+        FROM word_progress wp
+        JOIN words w ON wp.word_id = w.id
+        WHERE wp.profile_id = :profileId
+          AND wp.incorrect_count > 0
+        ORDER BY wp.incorrect_count DESC,
+                 wp.knowledge_coeff ASC
+        LIMIT 1
+    """)
+    suspend fun getToughestWordText(profileId: Int): String?
+
+    /**
+     * Returns per-CEFR-level word mastery for a given profile.
+     *
+     */
+    @Query("""
+        SELECT
+            l.name                                                        AS levelName,
+            COUNT(DISTINCT w.id)                                          AS totalWords,
+            COUNT(DISTINCT CASE
+                WHEN wp.profile_id = :profileId
+                 AND wp.knowledge_coeff >= :threshold
+                THEN w.id END)                                            AS learnedWords
+        FROM level l
+        LEFT JOIN words  w  ON w.level_id  = l.id
+        LEFT JOIN word_progress wp ON wp.word_id = w.id
+        GROUP BY l.id, l.name
+        ORDER BY l.id ASC
+    """)
+    suspend fun getWordLevelProgress(
+        profileId: Int,
+        threshold: Float
+    ): List<WordLevelProgress>
 }

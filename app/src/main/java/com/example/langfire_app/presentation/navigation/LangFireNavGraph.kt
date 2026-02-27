@@ -27,7 +27,16 @@ fun LangFireNavGraph(navController: NavHostController) {
             SessionScreen()
         }
         composable(Screen.Profile.route) {
-            ProfileScreen()
+            ProfileScreen(
+                onLibraryClick = { navController.navigate(Screen.Library.route) },
+                onBurnClick    = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Home.route) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                },
+                onProfileClick = { navController.navigate(Screen.Profile.route) }
+            )
         }
         composable(Screen.FortuneWheel.route) {
             FortuneWheelScreen()

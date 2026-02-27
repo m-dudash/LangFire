@@ -17,5 +17,7 @@ data class AchievementEntity(
     val value: Int?,
     val unlocked: Boolean,
     val description: String?,
+    @ColumnInfo(name = "icon", defaultValue = "") val icon: String = "",
+    @ColumnInfo(name = "title", defaultValue = "") val title: String = "",
     @ColumnInfo(name = "profile_id") val profileId: Int
 )

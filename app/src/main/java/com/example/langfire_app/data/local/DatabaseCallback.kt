@@ -44,6 +44,15 @@ class DatabaseCallback @Inject constructor(
         courseDao.insert(dutchCourse)
         courseDao.insert(slovakCourse)
 
+        val profileId = profileDao.insert(
+            ProfileEntity(
+                name = "Student",
+                xp = 0,
+                streakDays = 0,
+                lastActiveDate = System.currentTimeMillis()
+            )
+        )
         
+        gamificationSeeder.get().seedIfNeeded(profileId.toInt())
     }
 }

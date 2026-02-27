@@ -18,5 +18,7 @@ data class Achievement(
     val value: Int? = null,
     val unlocked: Boolean = false,
     val description: String? = null,
+    val icon: String = "",
+    val title: String = "",
     val profileId: Int
 )

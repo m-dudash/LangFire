@@ -270,5 +270,63 @@ class GamificationEngine @Inject constructor(
         const val XP_SPEED_ACHIEVEMENT = 25
         const val XP_RARE_ACHIEVEMENT = 100
         const val XP_DEFAULT_ACHIEVEMENT = 20
+
+        /**
+         * Minimum fraction of a level's words that must be mastered
+         * before the level counts as "completed" for CEFR purposes.
+         */
+        const val LEVEL_MASTERY_THRESHOLD = 0.8f
+
+        /**
+         * Typed result of [computeCourseProgress].
+         *
+         * @param achievedLevel          Highest CEFR level fully completed; null = nothing yet.
+         * @param targetLevel            Next level to work towards; null = C2 already mastered.
+         * @param wordsLearnedInTarget   Words mastered in [targetLevel].
+         * @param totalWordsInTarget     Total words in [targetLevel].
+         */
+        data class CourseLevelProgress(
+            val achievedLevel: String?,
+            val targetLevel: String?,
+            val wordsLearnedInTarget: Int,
+            val totalWordsInTarget: Int
+        )
+
+        /**
+         * Computes the full progression state for a course from raw per-level word stats.
+         *
+         * Algorithm (levels must be ordered A1 → C2 by the DAO query):
+         *  1. Walk levels in ascending order.
+         *  2. A level is *completed* when learnedWords / totalWords ≥ [masteryRatio].
+         *  3. [achievedLevel] = highest consecutive completed level.
+         *  4. [targetLevel]   = first non-empty level that is NOT yet completed.
+         *  5. If all levels are completed, [targetLevel] is null (mastery reached).
+         *  6. If no level is completed yet, [achievedLevel] is null.
+         */
+        fun computeCourseProgress(
+            levelStats: List<com.example.langfire_app.data.local.entities.WordLevelProgress>,
+            masteryRatio: Float = LEVEL_MASTERY_THRESHOLD
+        ): CourseLevelProgress {
+            var achievedLevel: String? = null
+            var targetStat: com.example.langfire_app.data.local.entities.WordLevelProgress? = null
+
+            for (stat in levelStats) {
+                if (stat.totalWords == 0) continue
+                val ratio = stat.learnedWords.toFloat() / stat.totalWords
+                if (ratio >= masteryRatio) {
+                    achievedLevel = stat.levelName
+                } else {
+                    targetStat = stat
+                    break
+                }
+            }
+
+            return CourseLevelProgress(
+                achievedLevel        = achievedLevel,
+                targetLevel          = targetStat?.levelName,
+                wordsLearnedInTarget = targetStat?.learnedWords ?: 0,
+                totalWordsInTarget   = targetStat?.totalWords   ?: 0
+            )
+        }
     }
 }

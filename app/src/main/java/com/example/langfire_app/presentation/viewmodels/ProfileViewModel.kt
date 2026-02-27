@@ -7,9 +7,11 @@ import com.example.langfire_app.domain.model.Achievement
 import com.example.langfire_app.domain.model.Course
 import com.example.langfire_app.domain.model.Profile
 import com.example.langfire_app.domain.usecase.CreateProfileUseCase
+import com.example.langfire_app.domain.model.CourseLevelInfo
 import com.example.langfire_app.domain.usecase.GetAchievementsUseCase
 import com.example.langfire_app.domain.usecase.GetAllCoursesUseCase
 import com.example.langfire_app.domain.usecase.GetCurrentStreakUseCase
+import com.example.langfire_app.domain.usecase.GetProfileStatsUseCase
 import com.example.langfire_app.domain.usecase.GetProfileUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
@@ -112,7 +114,7 @@ data class ProfileUiState(
     val name: String = "",
     val profile: Profile? = null,
     val availableCourses: List<Course> = emptyList(),
-    val isLoading: Boolean = false,
+    val isLoading: Boolean = true,
     val achievements: List<Achievement> = emptyList(),
     val totalCorrect: Int = 0,
     val totalErrors: Int = 0,
