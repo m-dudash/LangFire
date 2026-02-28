@@ -113,9 +113,9 @@ fun HomeScreen(
                     modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    val learned = state.learnedWords
-                    val practiced = state.learnedWordsGoal
-                    val toLearn = 500
+                    val learned = state.learnedCount
+                    val practiced = state.practicedCount
+                    val toLearn = state.toLearnCount
                     
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(24.dp),

@@ -66,4 +66,48 @@ interface WordProgressDao {
         profileId: Int,
         threshold: Float
     ): List<WordLevelProgress>
+
+
+    @Query("""
+    SELECT COUNT(DISTINCT wp.word_id)
+    FROM word_progress wp
+    JOIN words w ON w.id = wp.word_id
+    JOIN unit u ON u.id = w.unit_id
+    WHERE wp.profile_id = :profileId
+      AND u.course_id = :courseId
+""")
+    suspend fun countToLearnByCourse(
+        profileId: Int,
+        courseId: Int
+    ): Int
+
+    @Query("""
+    SELECT COUNT(DISTINCT wp.word_id)
+    FROM word_progress wp
+    JOIN words w ON w.id = wp.word_id
+    JOIN unit u ON u.id = w.unit_id
+    WHERE wp.profile_id = :profileId
+      AND u.course_id = :courseId
+      AND COALESCE(wp.knowledge_coeff, 0) > :threshold
+""")
+    suspend fun countPracticedByCourse(
+        profileId: Int,
+        courseId: Int,
+        threshold: Float = 0.30f
+    ): Int
+
+    @Query("""
+    SELECT COUNT(DISTINCT wp.word_id)
+    FROM word_progress wp
+    JOIN words w ON w.id = wp.word_id
+    JOIN unit u ON u.id = w.unit_id
+    WHERE wp.profile_id = :profileId
+      AND u.course_id = :courseId
+      AND COALESCE(wp.knowledge_coeff, 0) >= :threshold
+""")
+    suspend fun countLearnedByCourse(
+        profileId: Int,
+        courseId: Int,
+        threshold: Float = 0.85f
+    ): Int
 }

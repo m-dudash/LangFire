@@ -22,7 +22,7 @@ import com.example.langfire_app.data.local.entities.*
         CourseEntity::class,
         AppSettingEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

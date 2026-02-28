@@ -4,6 +4,7 @@ import com.example.langfire_app.data.local.dao.CourseDao
 import com.example.langfire_app.data.local.dao.WordProgressDao
 import com.example.langfire_app.domain.engine.GamificationEngine
 import com.example.langfire_app.domain.model.CourseLevelInfo
+import com.example.langfire_app.domain.model.HomeCourseStats
 import com.example.langfire_app.domain.model.ProfileStats
 import com.example.langfire_app.domain.repository.SettingsRepository
 import com.example.langfire_app.domain.repository.StatsRepository
@@ -66,5 +67,25 @@ class StatsRepositoryImpl @Inject constructor(
 
     companion object {
         const val LEARNED_THRESHOLD = 0.8f
+    }
+
+    override suspend fun getHomeCourseStats(profileId: Int, courseId: Int): HomeCourseStats {
+        val toLearn = wordProgressDao.countToLearnByCourse(profileId, courseId)
+        val practiced = wordProgressDao.countPracticedByCourse(
+            profileId = profileId,
+            courseId = courseId,
+            threshold = 0.30f
+        )
+        val learned = wordProgressDao.countLearnedByCourse(
+            profileId = profileId,
+            courseId = courseId,
+            threshold = 0.85f
+        )
+
+        return HomeCourseStats(
+            toLearn = toLearn,
+            practiced = practiced,
+            learned = learned
+        )
     }
 }
