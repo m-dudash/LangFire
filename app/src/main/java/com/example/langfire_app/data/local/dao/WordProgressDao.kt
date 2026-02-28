@@ -67,6 +67,33 @@ interface WordProgressDao {
         threshold: Float
     ): List<WordLevelProgress>
 
+    /**
+     * Returns per-CEFR-level word mastery for a given profile AND course.
+     */
+    @Query("""
+        SELECT
+            l.name                                                        AS levelName,
+            COUNT(DISTINCT CASE
+                WHEN u.course_id = :courseId
+                THEN w.id END)                                            AS totalWords,
+            COUNT(DISTINCT CASE
+                WHEN u.course_id = :courseId
+                 AND wp.profile_id = :profileId
+                 AND wp.knowledge_coeff >= :threshold
+                THEN w.id END)                                            AS learnedWords
+        FROM level l
+        LEFT JOIN words  w  ON w.level_id  = l.id
+        LEFT JOIN unit   u  ON u.id = w.unit_id
+        LEFT JOIN word_progress wp ON wp.word_id = w.id
+        GROUP BY l.id, l.name
+        ORDER BY l.id ASC
+    """)
+    suspend fun getWordLevelProgressByCourse(
+        profileId: Int,
+        courseId: Int,
+        threshold: Float
+    ): List<WordLevelProgress>
+
 
     @Query("""
     SELECT COUNT(DISTINCT wp.word_id)

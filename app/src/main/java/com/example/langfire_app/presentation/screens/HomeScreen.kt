@@ -41,6 +41,7 @@ import com.example.langfire_app.presentation.viewmodels.HomeViewModel
 import kotlin.math.cos
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.material.icons.filled.Bolt
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HOME SCREEN
@@ -373,7 +374,7 @@ private fun TopBar(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.AutoAwesome,
+                    imageVector = Icons.Default.Bolt,
                     contentDescription = null,
                     tint = Color(0xFFFFD740),
                     modifier = Modifier.size(16.dp)

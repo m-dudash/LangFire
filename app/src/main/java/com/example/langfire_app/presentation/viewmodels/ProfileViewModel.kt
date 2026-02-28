@@ -10,7 +10,6 @@ import com.example.langfire_app.domain.usecase.CreateProfileUseCase
 import com.example.langfire_app.domain.model.CourseLevelInfo
 import com.example.langfire_app.domain.usecase.GetAchievementsUseCase
 import com.example.langfire_app.domain.usecase.GetAllCoursesUseCase
-import com.example.langfire_app.domain.usecase.GetCurrentStreakUseCase
 import com.example.langfire_app.domain.usecase.GetProfileStatsUseCase
 import com.example.langfire_app.domain.usecase.GetProfileUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,7 +25,6 @@ class ProfileViewModel @Inject constructor(
     private val getProfileUseCase: GetProfileUseCase,
     private val getAllCoursesUseCase: GetAllCoursesUseCase,
     private val createProfileUseCase: CreateProfileUseCase,
-    private val getCurrentStreakUseCase: GetCurrentStreakUseCase,
     private val getAchievementsUseCase: GetAchievementsUseCase,
     private val getProfileStatsUseCase: GetProfileStatsUseCase
 ) : ViewModel() {
@@ -69,14 +67,10 @@ class ProfileViewModel @Inject constructor(
             getProfileStatsUseCase(profile.id)
         }
 
-        val streakDeferred = viewModelScope.async {
-            getCurrentStreakUseCase(profile.id)
-        }
 
         val achievements = achievementDeferred.await()
         val unlockedAchievements = unlockedAchievementsDeferred.await()
         val stats = statsDeferred.await()
-        val streak = streakDeferred.await()
 
         val totalAnswers = stats.totalCorrect + stats.totalErrors
         val accuracy = if (totalAnswers > 0)
@@ -88,7 +82,7 @@ class ProfileViewModel @Inject constructor(
             it.copy(
                 hasProfile = true,
                 isLoading = false,
-                profile = profile.copy(streakDays = streak),
+                profile = profile,
                 achievements = achievements,
                 totalCorrect = stats.totalCorrect,
                 totalErrors = stats.totalErrors,

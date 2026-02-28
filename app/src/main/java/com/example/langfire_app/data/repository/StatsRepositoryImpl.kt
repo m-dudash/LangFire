@@ -6,7 +6,6 @@ import com.example.langfire_app.domain.engine.GamificationEngine
 import com.example.langfire_app.domain.model.CourseLevelInfo
 import com.example.langfire_app.domain.model.HomeCourseStats
 import com.example.langfire_app.domain.model.ProfileStats
-import com.example.langfire_app.domain.repository.SettingsRepository
 import com.example.langfire_app.domain.repository.StatsRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -15,8 +14,7 @@ import javax.inject.Singleton
 @Singleton
 class StatsRepositoryImpl @Inject constructor(
     private val wordProgressDao: WordProgressDao,
-    private val courseDao: CourseDao,
-    private val settingsRepository: SettingsRepository
+    private val courseDao: CourseDao
 ) : StatsRepository {
 
     override suspend fun getProfileStats(profileId: Int): ProfileStats {
@@ -29,31 +27,26 @@ class StatsRepositoryImpl @Inject constructor(
         val toughestWord = wordProgressDao.getToughestWordText(profileId)
 
 
-        // ── CEFR progression — fully computed by the gamification engine ──
-        val levelStats = wordProgressDao.getWordLevelProgress(
-            profileId = profileId,
-            threshold = LEARNED_THRESHOLD
-        )
-        val progress = GamificationEngine.computeCourseProgress(levelStats)
-
-        val courseId = settingsRepository.getCurrentCourseId()
-        val course   = courseId?.let { courseDao.getById(it) }
-
-        val courseProgress: List<CourseLevelInfo> =
-            if (course != null) {
-                listOf(
-                    CourseLevelInfo(
-                        courseName           = course.name,
-                        courseIcon           = course.icon,
-                        targetLang           = course.targetLang,
-                        achievedLevel        = progress.achievedLevel,
-                        targetLevel          = progress.targetLevel,
-                        wordsLearnedInTarget = progress.wordsLearnedInTarget,
-                        totalWordsInTarget   = progress.totalWordsInTarget
-                    )
+        // ── CEFR progression for all courses ───────────────────────────
+        val courseProgress: List<CourseLevelInfo> = courseDao.getAll()
+            .mapNotNull { course ->
+                val levelStats = wordProgressDao.getWordLevelProgressByCourse(
+                    profileId = profileId,
+                    courseId = course.id,
+                    threshold = LEARNED_THRESHOLD
                 )
-            } else {
-                emptyList()
+                if (levelStats.none { it.totalWords > 0 }) return@mapNotNull null
+
+                val progress = GamificationEngine.computeCourseProgress(levelStats)
+                CourseLevelInfo(
+                    courseName           = course.name,
+                    courseIcon           = course.icon,
+                    targetLang           = course.targetLang,
+                    achievedLevel        = progress.achievedLevel,
+                    targetLevel          = progress.targetLevel,
+                    wordsLearnedInTarget = progress.wordsLearnedInTarget,
+                    totalWordsInTarget   = progress.totalWordsInTarget
+                )
             }
 
         return ProfileStats(
