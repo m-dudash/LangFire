@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.example.langfire_app.domain.model.Behavior
+import com.example.langfire_app.domain.usecase.ProcessBehaviorUseCase
 
 
 @HiltViewModel
@@ -21,7 +23,9 @@ class HomeViewModel @Inject constructor(
     private val getProfileUseCase: GetProfileUseCase,
     private val courseRepository: CourseRepository,
     private val settingsRepository: SettingsRepository,
-    private val statsRepository: StatsRepository
+    private val statsRepository: StatsRepository,
+    private val processBehaviorUseCase: ProcessBehaviorUseCase,
+    private val behaviorRepository: com.example.langfire_app.domain.repository.BehaviorRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -43,6 +47,8 @@ class HomeViewModel @Inject constructor(
                         hasActiveProfile = true,
                         streakDays = profile.streakDays,
                         xp = profile.xp,
+                        xpMultiplier = profile.xpMultiplier,
+                        xpMultiplierExpiresAt = profile.xpMultiplierExpiresAt,
                     )
                 }
             } else {
@@ -78,8 +84,16 @@ class HomeViewModel @Inject constructor(
 
             if (profile != null && activeCourse != null) {
                 loadHomeCourseStats(profile.id, activeCourse.id)
+                checkFortuneAvailability(profile.id)
             }
         }
+    }
+
+    private suspend fun checkFortuneAvailability(profileId: Int) {
+        val now = System.currentTimeMillis()
+        val startOfToday = (now / (24 * 60 * 60 * 1000L)) * (24 * 60 * 60 * 1000L)
+        val spins = behaviorRepository.getBehaviorsByTypeAfter(profileId, "fortune_spin", startOfToday)
+        _uiState.update { it.copy(isFortuneWheelAvailable = spins.isEmpty()) }
     }
 
     /** Persist the selected course and update the top-bar immediately. */
@@ -120,6 +134,28 @@ class HomeViewModel @Inject constructor(
             )
         }
     }
+
+    fun spinFortuneWheel() {
+        viewModelScope.launch {
+            val profile = getProfileUseCase() ?: return@launch
+            val behavior = Behavior(
+                type = "fortune_spin",
+                profileId = profile.id
+            )
+            processBehaviorUseCase(behavior)
+
+            val updated = getProfileUseCase()
+            if (updated != null) {
+                _uiState.update {
+                    it.copy(
+                        xp = updated.xp,
+                        xpMultiplier = updated.xpMultiplier,
+                        xpMultiplierExpiresAt = updated.xpMultiplierExpiresAt,
+                    )
+                }
+            }
+        }
+    }
 }
 
 data class HomeUiState(
@@ -138,4 +174,7 @@ data class HomeUiState(
     val toLearnCount: Int = 0,
     val practicedCount: Int = 0,
     val learnedCount: Int = 0,
+    val xpMultiplier: Int = 1,
+    val xpMultiplierExpiresAt: Long? = null,
+    val isFortuneWheelAvailable: Boolean = true,
 )

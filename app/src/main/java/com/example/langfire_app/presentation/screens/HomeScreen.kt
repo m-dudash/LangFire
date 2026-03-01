@@ -100,6 +100,8 @@ fun HomeScreen(
                 languageName  = state.languageName,
                 languageLevel = state.languageLevel,
                 xp            = state.xp,
+                xpMultiplier  = state.xpMultiplier,
+                xpMultiplierExpiresAt = state.xpMultiplierExpiresAt,
                 onLanguageClick = { requireProfile { viewModel.showLanguagePicker() } }
             )
 
@@ -151,10 +153,21 @@ fun HomeScreen(
                     }
                 }
 
+                if (state.xpMultiplier > 1 && state.xpMultiplierExpiresAt != null && state.xpMultiplierExpiresAt!! > System.currentTimeMillis()) {
+                    MultiplierBadgeWidget(
+                        multiplier = state.xpMultiplier,
+                        expiresAt = state.xpMultiplierExpiresAt!!,
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(start = 20.dp, bottom = 8.dp)
+                    )
+                }
+
                 FortuneWheelBadge(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(end = 20.dp, bottom = 8.dp),
+                    isAvailable = state.isFortuneWheelAvailable,
                     onClick = { requireProfile(onFortuneClick) }
                 )
 
@@ -298,6 +311,8 @@ private fun TopBar(
     languageName: String,
     languageLevel: String,
     xp: Int,
+    xpMultiplier: Int,
+    xpMultiplierExpiresAt: Long?,
     onLanguageClick: () -> Unit
 ) {
     Row(
@@ -359,33 +374,12 @@ private fun TopBar(
             }
         }
 
-        // XP Badge
-        Surface(
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(50), // Pill shape
-            color = Color(0xFF263238),
-            border = androidx.compose.foundation.BorderStroke(2.dp, Brush.horizontalGradient(
-                listOf(Color(0xFFFFD740), Color(0xFFFFAB00))
-            )),
-            shadowElevation = 6.dp
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Bolt,
-                    contentDescription = null,
-                    tint = Color(0xFFFFD740),
-                    modifier = Modifier.size(16.dp)
-                )
-                Text(
-                    text = formatXp(xp),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White
-                )
-            }
+            XpBadge(xp = xp)
+
         }
     }
 }
@@ -641,23 +635,116 @@ private fun DrawScope.drawFlameLayer(
 // FORTUNE WHEEL
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
+private fun MultiplierBadgeWidget(
+    multiplier: Int,
+    expiresAt: Long,
+    modifier: Modifier = Modifier
+) {
+    var remainingTime by remember(expiresAt) { 
+        mutableStateOf(expiresAt - System.currentTimeMillis()) 
+    }
+    
+    LaunchedEffect(expiresAt) {
+        while (remainingTime > 0) {
+            kotlinx.coroutines.delay(1000)
+            remainingTime = expiresAt - System.currentTimeMillis()
+        }
+    }
+
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier.size(72.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Glowing background effect
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFFFFD740).copy(alpha = 0.4f),
+                            Color(0xFFFFAB00).copy(alpha = 0.1f),
+                            Color.Transparent
+                        )
+                    ),
+                    radius = size.minDimension / 1.5f
+                )
+            }
+            
+            // Main Circle
+            Surface(
+                shape = androidx.compose.foundation.shape.CircleShape,
+                color = Color(0xFF212121),
+                border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFFFD740)),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "x$multiplier",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White,
+                        fontSize = 18.sp
+                    )
+                    Text(
+                        text = "XP boost",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White,
+                        fontSize = 10.sp
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = formatRemainingTime(remainingTime),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            fontSize = 10.sp
+        )
+    }
+}
+
+@Composable
 private fun FortuneWheelBadge(
     modifier: Modifier = Modifier,
+    isAvailable: Boolean = true,
     onClick: () -> Unit
 ) {
     val tr = rememberInfiniteTransition(label = "wheel")
-    val rotation by tr.animateFloat(
-        0f, 360f,
-        infiniteRepeatable(tween(9000, easing = LinearEasing)),
-        label = "spin"
-    )
+    val rotation by if (isAvailable) {
+        tr.animateFloat(
+            0f, 360f,
+            infiniteRepeatable(tween(9000, easing = LinearEasing)),
+            label = "spin"
+        )
+    } else {
+        remember { mutableStateOf(0f) }
+    }
 
-    val segColors = listOf(
-        Color(0xFFFE9502), Color(0xFFE53935),
-        Color(0xFF9E9E9E), Color(0xFFFAFAFA),
-        Color(0xFFFE9502), Color(0xFFE53935),
-        Color(0xFF9E9E9E), Color(0xFFFAFAFA),
-    )
+    val segColors = if (isAvailable) {
+        listOf(
+            Color(0xFFFE9502), Color(0xFFE53935),
+            Color(0xFF9E9E9E), Color(0xFFFAFAFA),
+            Color(0xFFFE9502), Color(0xFFE53935),
+            Color(0xFF9E9E9E), Color(0xFFFAFAFA),
+        )
+    } else {
+        listOf(
+            Color(0xFF757575), Color(0xFF616161),
+            Color(0xFF424242), Color(0xFFBDBDBD),
+            Color(0xFF757575), Color(0xFF616161),
+            Color(0xFF424242), Color(0xFFBDBDBD),
+        )
+    }
 
     Column(
         modifier = modifier,
@@ -666,7 +753,11 @@ private fun FortuneWheelBadge(
         Canvas(
             modifier = Modifier
                 .size(72.dp)
-                .pointerInput(Unit) { detectTapGestures(onTap = { onClick() }) }
+                .pointerInput(isAvailable) { 
+                    if (isAvailable) {
+                        detectTapGestures(onTap = { onClick() })
+                    }
+                }
         ) {
             val cx = size.width / 2f
             val cy = size.height / 2f
@@ -711,6 +802,50 @@ private fun FortuneWheelBadge(
         Text("Daily", style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.tertiary, fontSize = 10.sp)
     }
+}
+
+
+@Composable
+private fun XpBadge(xp: Int) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = Color(0xFF263238),
+        border = androidx.compose.foundation.BorderStroke(2.dp, Brush.horizontalGradient(
+            listOf(Color(0xFFFFD740), Color(0xFFFFAB00))
+        )),
+        shadowElevation = 6.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Bolt,
+                contentDescription = null,
+                tint = Color(0xFFFFD740),
+                modifier = Modifier.size(16.dp)
+            )
+            Text(
+                text = formatXp(xp),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White
+            )
+        }
+    }
+}
+
+
+private fun isMultiplierActive(multiplier: Int, expiresAt: Long?): Boolean {
+    return multiplier > 1 && expiresAt != null && expiresAt > System.currentTimeMillis()
+}
+
+private fun formatRemainingTime(ms: Long): String {
+    val totalMinutes = (ms / 60000).coerceAtLeast(0)
+    val hours = totalMinutes / 60
+    val minutes = totalMinutes % 60
+    return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

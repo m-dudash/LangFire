@@ -17,5 +17,6 @@ data class EngineResult(
     val newAchievements: List<Achievement> = emptyList(),
     val updatedAchievements: List<Achievement> = emptyList(),
     val streakUpdated: Boolean = false,
-    val newStreakDays: Int = 0
+    val newStreakDays: Int = 0,
+    val fortuneReward: FortuneReward? = null
 )

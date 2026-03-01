@@ -9,5 +9,7 @@ data class Profile(
     val name: String,
     val xp: Int = 0,
     val streakDays: Int = 0,
-    val lastActiveDate: Long = System.currentTimeMillis()
+    val lastActiveDate: Long = System.currentTimeMillis(),
+    val xpMultiplier: Int = 1,
+    val xpMultiplierExpiresAt: Long? = null
 )

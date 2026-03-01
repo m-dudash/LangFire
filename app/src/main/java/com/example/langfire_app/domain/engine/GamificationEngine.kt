@@ -7,6 +7,8 @@ import com.example.langfire_app.domain.repository.ProfileRepository
 import com.example.langfire_app.domain.repository.RuleRepository
 import javax.inject.Inject
 import javax.inject.Singleton
+import java.util.concurrent.TimeUnit
+import kotlin.random.Random
 
 /**
  * ═══════════════════════════════════════════════════════════════════
@@ -57,6 +59,10 @@ class GamificationEngine @Inject constructor(
         val savedId = behaviorRepository.saveBehavior(behavior)
         val savedBehavior = behavior.copy(id = savedId.toInt())
 
+        if (savedBehavior.type == "fortune_spin") {
+            return processFortuneSpin(savedBehavior.profileId)
+        }
+
         // Step 2: Load all rules
         val rules = ruleRepository.getAllRules()
 
@@ -86,7 +92,10 @@ class GamificationEngine @Inject constructor(
 
         // Step 5: Award XP
         if (totalXpGranted > 0) {
-            profileRepository.addXp(savedBehavior.profileId, totalXpGranted)
+            val finalXp = applyXpMultiplierIfActive(savedBehavior.profileId, totalXpGranted)
+            if (finalXp > 0) {
+                profileRepository.addXp(savedBehavior.profileId, finalXp)
+            }
         }
 
         // Step 6: Check & update streak (always check on relevant behaviors)
@@ -254,6 +263,108 @@ class GamificationEngine @Inject constructor(
     }
 
     /**
+     * FORTUNE ORIENTED CODE
+     */
+
+    private suspend fun processFortuneSpin(profileId: Int): EngineResult {
+        val now = System.currentTimeMillis()
+
+        val spinsToday = behaviorRepository.getBehaviorsByTypeAfter(
+            profileId = profileId,
+            type = "fortune_spin",
+            fromTimestamp = startOfToday(now)
+        )
+
+        if (spinsToday.isNotEmpty()) {
+            return EngineResult()
+        }
+
+        val hasUnique = achievementRepository
+            .getAchievementsByType(profileId, UNIQUE_FORTUNE_ACHIEVEMENT_TYPE)
+            .isNotEmpty()
+
+        val options = mutableListOf(
+            RewardOption(FortuneReward.Multiplier(2), 20.0),
+            RewardOption(FortuneReward.Multiplier(3), 12.0),
+            RewardOption(FortuneReward.Multiplier(5), 6.0),
+            RewardOption(FortuneReward.Xp(200), 22.0),
+            RewardOption(FortuneReward.Xp(300), 12.0),
+            RewardOption(FortuneReward.Xp(500), 6.0)
+        )
+
+        if (!hasUnique) {
+            options.add(RewardOption(FortuneReward.UniqueAchievement, 0.2))
+        }
+
+        val reward = pickWeightedReward(options)
+
+        when (reward) {
+            is FortuneReward.Xp -> profileRepository.addXp(profileId, reward.amount)
+            is FortuneReward.Multiplier -> {
+                val expiresAt = now + TimeUnit.HOURS.toMillis(FORTUNE_MULTIPLIER_HOURS)
+                profileRepository.setXpMultiplier(profileId, reward.multiplier, expiresAt)
+            }
+            FortuneReward.UniqueAchievement -> {
+                val achievement = Achievement(
+                    type = UNIQUE_FORTUNE_ACHIEVEMENT_TYPE,
+                    unlocked = true,
+                    description = "Unique fortune wheel reward",
+                    profileId = profileId
+                )
+                achievementRepository.saveAchievement(achievement)
+            }
+        }
+
+        return EngineResult(
+            xpGranted = if (reward is FortuneReward.Xp) reward.amount else 0,
+            fortuneReward = reward
+        )
+    }
+
+    private fun startOfToday(now: Long): Long {
+        val days = TimeUnit.MILLISECONDS.toDays(now)
+        return TimeUnit.DAYS.toMillis(days)
+    }
+
+    private fun pickWeightedReward(options: List<RewardOption>): FortuneReward {
+        val total = options.sumOf { it.weight }
+        val r = Random.nextDouble(total)
+        var acc = 0.0
+        for (option in options) {
+            acc += option.weight
+            if (r <= acc) return option.reward
+        }
+        return options.last().reward
+    }
+
+    private suspend fun applyXpMultiplierIfActive(profileId: Int, baseXp: Int): Int {
+        val profile = profileRepository.getProfileById(profileId) ?: return baseXp
+        val multiplier = profile.xpMultiplier
+        val expiresAt = profile.xpMultiplierExpiresAt
+        val now = System.currentTimeMillis()
+
+        if (multiplier > 1 && expiresAt != null) {
+            if (now < expiresAt) {
+                return baseXp * multiplier
+            }
+            profileRepository.clearXpMultiplier(profileId)
+        }
+
+        return baseXp
+    }
+
+    private fun isSameDay(a: Long, b: Long): Boolean {
+        val dayA = TimeUnit.MILLISECONDS.toDays(a)
+        val dayB = TimeUnit.MILLISECONDS.toDays(b)
+        return dayA == dayB
+    }
+
+    private data class RewardOption(
+        val reward: FortuneReward,
+        val weight: Double
+    )
+
+    /**
      * Sealed class representing the result of processing a reward.
      */
     private sealed class RewardResult {
@@ -270,6 +381,9 @@ class GamificationEngine @Inject constructor(
         const val XP_SPEED_ACHIEVEMENT = 25
         const val XP_RARE_ACHIEVEMENT = 100
         const val XP_DEFAULT_ACHIEVEMENT = 20
+
+        const val UNIQUE_FORTUNE_ACHIEVEMENT_TYPE = "unique_fortune_reward"
+        const val FORTUNE_MULTIPLIER_HOURS = 4L
 
         /**
          * Minimum fraction of a level's words that must be mastered

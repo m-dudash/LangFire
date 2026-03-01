@@ -36,4 +36,12 @@ class ProfileRepositoryImpl @Inject constructor(
     override suspend fun updateStreak(profileId: Int, streakDays: Int, lastActiveDate: Long) {
         profileDao.updateStreak(profileId, streakDays, lastActiveDate)
     }
+
+    override suspend fun setXpMultiplier(profileId: Int, multiplier: Int, expiresAt: Long?) {
+        profileDao.setXpMultiplier(profileId, multiplier, expiresAt)
+    }
+
+    override suspend fun clearXpMultiplier(profileId: Int) {
+        profileDao.clearXpMultiplier(profileId)
+    }
 }

@@ -24,6 +24,20 @@ interface ProfileDao {
     @Query("UPDATE profile SET streak_days = :streakDays, last_active_date = :lastActiveDate WHERE id = :profileId")
     suspend fun updateStreak(profileId: Int, streakDays: Int, lastActiveDate: Long)
 
+    @Query("""
+        UPDATE profile 
+        SET xp_multiplier = :multiplier, xp_multiplier_expires_at = :expiresAt 
+        WHERE id = :profileId
+    """)
+    suspend fun setXpMultiplier(profileId: Int, multiplier: Int, expiresAt: Long?)
+
+    @Query("""
+        UPDATE profile 
+        SET xp_multiplier = 1, xp_multiplier_expires_at = NULL 
+        WHERE id = :profileId
+    """)
+    suspend fun clearXpMultiplier(profileId: Int)
+
     @Query("DELETE FROM profile WHERE id = :id")
     suspend fun deleteById(id: Int)
 }

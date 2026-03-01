@@ -39,7 +39,13 @@ fun LangFireNavGraph(navController: NavHostController) {
             )
         }
         composable(Screen.FortuneWheel.route) {
-            FortuneWheelScreen()
+            FortuneScreen(
+                onDismiss = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Home.route) { inclusive = true }
+                    }
+                }
+            )
         }
     }
 }

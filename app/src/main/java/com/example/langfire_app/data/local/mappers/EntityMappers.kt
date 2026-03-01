@@ -22,7 +22,9 @@ object EntityMappers {
         name = name,
         xp = xp,
         streakDays = streakDays,
-        lastActiveDate = lastActiveDate
+        lastActiveDate = lastActiveDate,
+        xpMultiplier = xpMultiplier,
+        xpMultiplierExpiresAt = xpMultiplierExpiresAt
     )
 
     fun Profile.toEntity(): ProfileEntity = ProfileEntity(
@@ -30,7 +32,9 @@ object EntityMappers {
         name = name,
         xp = xp,
         streakDays = streakDays,
-        lastActiveDate = lastActiveDate
+        lastActiveDate = lastActiveDate,
+        xpMultiplier = xpMultiplier,
+        xpMultiplierExpiresAt = xpMultiplierExpiresAt
     )
 
     // ──────────────────────────────────────────────
