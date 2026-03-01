@@ -41,7 +41,10 @@ import com.example.langfire_app.presentation.viewmodels.HomeViewModel
 import kotlin.math.cos
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.ui.draw.rotate
+import kotlinx.coroutines.delay
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HOME SCREEN
@@ -635,50 +638,92 @@ private fun DrawScope.drawFlameLayer(
 // FORTUNE WHEEL
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
-private fun MultiplierBadgeWidget(
+fun MultiplierBadgeWidget(
     multiplier: Int,
     expiresAt: Long,
     modifier: Modifier = Modifier
 ) {
-    var remainingTime by remember(expiresAt) { 
-        mutableStateOf(expiresAt - System.currentTimeMillis()) 
+    var remainingTime by remember(expiresAt) {
+        mutableStateOf(expiresAt - System.currentTimeMillis())
     }
-    
+
     LaunchedEffect(expiresAt) {
         while (remainingTime > 0) {
-            kotlinx.coroutines.delay(1000)
+            delay(1000)
             remainingTime = expiresAt - System.currentTimeMillis()
         }
     }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "fireTransition")
+
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3500, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "fireRotation"
+    )
+
+    val pulse by infiniteTransition.animateFloat(
+        initialValue = 0.8f,
+        targetValue = 1.2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(300, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "firePulse"
+    )
+
+    val fireColors = listOf(
+        Color(0xFFFFD740),
+        Color(0xFFFF9800),
+        Color(0xFFE65100),
+        Color(0xFFD50000),
+        Color(0xFFFFD740)
+    )
 
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
-            modifier = Modifier.size(72.dp),
+            modifier = Modifier
+                .size(80.dp)
+                .padding(4.dp),
             contentAlignment = Alignment.Center
         ) {
-            // Glowing background effect
             Canvas(modifier = Modifier.fillMaxSize()) {
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            Color(0xFFFFD740).copy(alpha = 0.4f),
-                            Color(0xFFFFAB00).copy(alpha = 0.1f),
+                            Color(0xFFFF5722).copy(alpha = 0.5f),
+                            Color(0xFFD50000).copy(alpha = 0.2f),
                             Color.Transparent
                         )
                     ),
-                    radius = size.minDimension / 1.5f
+                    radius = (size.minDimension / 2) * pulse
                 )
             }
-            
-            // Main Circle
+
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .rotate(rotation)
+            ) {
+                drawCircle(
+                    brush = Brush.sweepGradient(fireColors),
+                    style = Stroke(width = 5.dp.toPx())
+                )
+            }
+
             Surface(
-                shape = androidx.compose.foundation.shape.CircleShape,
-                color = Color(0xFF212121),
-                border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFFFD740)),
-                modifier = Modifier.fillMaxSize()
+                shape = CircleShape,
+                color = Color(0xFF121212),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(5.dp)
             ) {
                 Column(
                     modifier = Modifier.fillMaxSize(),
@@ -689,26 +734,28 @@ private fun MultiplierBadgeWidget(
                         text = "x$multiplier",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Black,
-                        color = Color.White,
-                        fontSize = 18.sp
+                        color = Color(0xFFFFD740),
+                        fontSize = 20.sp
                     )
                     Text(
                         text = "XP boost",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White.copy(alpha = 0.8f),
                         fontSize = 10.sp
                     )
                 }
             }
         }
-        Spacer(Modifier.height(4.dp))
+
+        Spacer(Modifier.height(6.dp))
+
         Text(
             text = formatRemainingTime(remainingTime),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            fontSize = 10.sp
+            color = Color(0xFFFF9800),
+            fontSize = 12.sp
         )
     }
 }
