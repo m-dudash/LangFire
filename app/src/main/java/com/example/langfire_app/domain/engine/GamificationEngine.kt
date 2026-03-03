@@ -269,13 +269,17 @@ class GamificationEngine @Inject constructor(
     private suspend fun processFortuneSpin(profileId: Int): EngineResult {
         val now = System.currentTimeMillis()
 
+        // IMPORTANT: the behavior is already saved to DB before this function is called
+        // (see processBehavior step 1). So we check size > 1, not isNotEmpty(),
+        // to detect whether a *previous* spin today exists beyond the current one.
         val spinsToday = behaviorRepository.getBehaviorsByTypeAfter(
             profileId = profileId,
             type = "fortune_spin",
             fromTimestamp = startOfToday(now)
         )
 
-        if (spinsToday.isNotEmpty()) {
+        if (spinsToday.size > 1) {
+            // Already spun today before this attempt — return empty reward
             return EngineResult()
         }
 
@@ -302,6 +306,9 @@ class GamificationEngine @Inject constructor(
             is FortuneReward.Xp -> profileRepository.addXp(profileId, reward.amount)
             is FortuneReward.Multiplier -> {
                 val expiresAt = now + TimeUnit.HOURS.toMillis(FORTUNE_MULTIPLIER_HOURS)
+                // Always clear any existing (possibly expired) multiplier first so the new
+                // one is never silently blocked by a stale DB value.
+                profileRepository.clearXpMultiplier(profileId)
                 profileRepository.setXpMultiplier(profileId, reward.multiplier, expiresAt)
             }
             FortuneReward.UniqueAchievement -> {

@@ -34,7 +34,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.example.langfire_app.domain.model.Course
 import com.example.langfire_app.presentation.ui.theme.*
 import com.example.langfire_app.presentation.viewmodels.HomeViewModel
@@ -45,6 +48,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.ui.draw.rotate
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HOME SCREEN
@@ -60,6 +64,16 @@ fun HomeScreen(
     onFortuneClick: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Refresh data every time this screen becomes the active (RESUMED) destination.
+    // This ensures XP, multipliers, and fortune wheel availability are always up to date
+    // when returning from FortuneWheel or any other screen, without needing an app restart.
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            viewModel.refresh()
+        }
+    }
 
     val context = LocalContext.current
 
@@ -654,8 +668,10 @@ fun MultiplierBadgeWidget(
         }
     }
 
+    // --- Анимации для огненного эффекта ---
     val infiniteTransition = rememberInfiniteTransition(label = "fireTransition")
 
+    // 1. Анимация вращения огненного кольца
     val rotation by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
@@ -666,22 +682,24 @@ fun MultiplierBadgeWidget(
         label = "fireRotation"
     )
 
+    // 2. Анимация пульсации для внешнего свечения (эффект дыхания огня)
     val pulse by infiniteTransition.animateFloat(
         initialValue = 0.8f,
         targetValue = 1.2f,
         animationSpec = infiniteRepeatable(
-            animation = tween(300, easing = FastOutSlowInEasing),
+            animation = tween(800, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "firePulse"
     )
 
+    // Палитра огня: от желтого в центре к красному по краям
     val fireColors = listOf(
-        Color(0xFFFFD740),
-        Color(0xFFFF9800),
-        Color(0xFFE65100),
-        Color(0xFFD50000),
-        Color(0xFFFFD740)
+        Color(0xFFFFD740), // Ярко-желтый
+        Color(0xFFFF9800), // Оранжевый
+        Color(0xFFE65100), // Темно-оранжевый
+        Color(0xFFD50000), // Красный
+        Color(0xFFFFD740)  // Замыкаем круг желтым для плавного перехода
     )
 
     Column(
@@ -690,10 +708,11 @@ fun MultiplierBadgeWidget(
     ) {
         Box(
             modifier = Modifier
-                .size(80.dp)
+                .size(80.dp) // Слегка увеличили размер, чтобы вместить обводку
                 .padding(4.dp),
             contentAlignment = Alignment.Center
         ) {
+            // Пульсирующее фоновое свечение (жар)
             Canvas(modifier = Modifier.fillMaxSize()) {
                 drawCircle(
                     brush = Brush.radialGradient(
@@ -707,6 +726,7 @@ fun MultiplierBadgeWidget(
                 )
             }
 
+            // Вращающееся огненное кольцо
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
@@ -714,16 +734,17 @@ fun MultiplierBadgeWidget(
             ) {
                 drawCircle(
                     brush = Brush.sweepGradient(fireColors),
-                    style = Stroke(width = 5.dp.toPx())
+                    style = Stroke(width = 5.dp.toPx()) // Толщина кольца
                 )
             }
 
+            // Основной внутренний круг
             Surface(
                 shape = CircleShape,
-                color = Color(0xFF121212),
+                color = Color(0xFF121212), // Сделали фон чуть темнее для контраста с огнем
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(5.dp)
+                    .padding(5.dp) // Отступ от огненной рамки
             ) {
                 Column(
                     modifier = Modifier.fillMaxSize(),
@@ -734,7 +755,7 @@ fun MultiplierBadgeWidget(
                         text = "x$multiplier",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Black,
-                        color = Color(0xFFFFD740),
+                        color = Color(0xFFFFD740), // Сделали текст золотым
                         fontSize = 20.sp
                     )
                     Text(
@@ -750,8 +771,9 @@ fun MultiplierBadgeWidget(
 
         Spacer(Modifier.height(6.dp))
 
+        // Таймер тоже стилизован под огонь
         Text(
-            text = formatRemainingTime(remainingTime),
+            text = formatRemainingTime(remainingTime), // Убедитесь, что эта функция доступна
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
             color = Color(0xFFFF9800),

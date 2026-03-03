@@ -50,17 +50,13 @@ fun FortuneScreen(
     viewModel: FortuneViewModel = hiltViewModel(),
     onDismiss: () -> Unit = {}
 ) {
-    val isAlreadySpun by viewModel.isAlreadySpun.collectAsState()
     var isSpinning by remember { mutableStateOf(false) }
+    // hasSpun stays true after spin completes so the wheel/button remain disabled
+    var hasSpun by remember { mutableStateOf(false) }
     var rewardPopup by remember { mutableStateOf<FortuneReward?>(null) }
+    var showPopup by remember { mutableStateOf(false) }
     val rotation = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
-
-    LaunchedEffect(isAlreadySpun) {
-        if (isAlreadySpun && !isSpinning && rewardPopup == null) {
-            onDismiss()
-        }
-    }
 
     val segments = remember {
         val rewards = listOf(
@@ -80,7 +76,7 @@ fun FortuneScreen(
             SegmentFill.Solid(Color(0xFFFF2400)),
             SegmentFill.Solid(Color(0xFFFFA500)),
             SegmentFill.Solid(Color(0xFFFFFFFF)),
-            SegmentFill.Gradient(Brush.linearGradient(listOf(Color(0xFFFF007F), Color(0xFF651FFF))))
+            SegmentFill.Gradient(Brush.linearGradient(listOf(Color(0xFFFF00BF), Color(0xFF5219D0))))
         )
 
         rewards.mapIndexed { index, reward ->
@@ -89,13 +85,6 @@ fun FortuneScreen(
                 label = generateLabel(reward),
                 fill = fills[index % fills.size]
             )
-        }
-    }
-
-    LaunchedEffect(rewardPopup) {
-        if (rewardPopup != null) {
-            delay(2500)
-            rewardPopup = null
         }
     }
 
@@ -119,16 +108,20 @@ fun FortuneScreen(
                 Canvas(
                     modifier = Modifier
                         .size(340.dp)
-                        .pointerInput(Unit) {
-                            detectTapGestures {
-                                if (!isSpinning) {
+                        .pointerInput(isSpinning, hasSpun) {
+                            if (!isSpinning && !hasSpun) {
+                                detectTapGestures {
+                                    isSpinning = true
                                     scope.launch {
                                         spinWheel(viewModel, rotation, segments) { reward ->
-                                            isSpinning = false
                                             rewardPopup = reward
+                                            showPopup = true
+                                            isSpinning = false
+                                            hasSpun = true
+                                            delay(2500)
+                                            onDismiss()
                                         }
                                     }
-                                    isSpinning = true
                                 }
                             }
                         }
@@ -235,43 +228,24 @@ fun FortuneScreen(
                     drawPath(pointerPath, color = Color.White, style = Stroke(width = 3.dp.toPx()))
                 }
 
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = rewardPopup != null,
-                    enter = fadeIn(tween(300)) + scaleIn(tween(300, easing = FastOutSlowInEasing)),
-                    exit = fadeOut(tween(200)) + scaleOut(tween(200))
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(24.dp),
-                        tonalElevation = 10.dp,
-                        shadowElevation = 12.dp,
-                        color = MaterialTheme.colorScheme.surface,
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .padding(horizontal = 32.dp, vertical = 24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text("🎉 WIN!", fontWeight = FontWeight.Black, fontSize = 24.sp, color = Color(0xFFFF007F))
-                            Spacer(Modifier.height(12.dp))
-                            Text(rewardText(rewardPopup), fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
             }
 
             Spacer(modifier = Modifier.weight(1f))
 
             Button(
                 onClick = {
-                    if (!isSpinning) {
+                    if (!isSpinning && !hasSpun) {
+                        isSpinning = true
                         scope.launch {
                             spinWheel(viewModel, rotation, segments) { reward ->
-                                isSpinning = false
                                 rewardPopup = reward
+                                showPopup = true
+                                isSpinning = false
+                                hasSpun = true
+                                delay(2500)
+                                onDismiss()
                             }
                         }
-                        isSpinning = true
                     }
                 },
                 modifier = Modifier
@@ -279,12 +253,20 @@ fun FortuneScreen(
                     .fillMaxWidth(0.8f),
                 shape = CircleShape,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isSpinning) Color.Gray else Color(0xFFFF007F)
+                    containerColor = when {
+                        hasSpun -> Color(0xFF388E3C)  // green = done!
+                        isSpinning -> Color.Gray
+                        else -> Color(0xFFD77A0B)
+                    }
                 ),
-                enabled = !isSpinning
+                enabled = !isSpinning && !hasSpun
             ) {
                 Text(
-                    text = if (isSpinning) "SPINNING..." else "SPIN!",
+                    text = when {
+                        hasSpun -> "DONE ✓"
+                        isSpinning -> "SPINNING..."
+                        else -> "SPIN!"
+                    },
                     fontWeight = FontWeight.Black,
                     fontSize = 20.sp,
                     color = Color.White
@@ -293,6 +275,39 @@ fun FortuneScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
         }
+
+        // ── Win popup — floats centered, no dark backdrop ──────────────────
+        AnimatedVisibility(
+            visible = showPopup,
+            enter = fadeIn(tween(400)) + scaleIn(tween(400, easing = FastOutSlowInEasing)),
+            exit  = fadeOut(tween(250)) + scaleOut(tween(250))
+        ) {
+            Surface(
+                shape = RoundedCornerShape(28.dp),
+                tonalElevation = 16.dp,
+                shadowElevation = 24.dp,
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 48.dp, vertical = 36.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "🎉 YOU WON!",
+                        fontWeight = FontWeight.Black,
+                        fontSize = 28.sp,
+                        color = Color(0xFFFF007F)
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        text = if (rewardPopup != null) rewardText(rewardPopup) else "Better luck next time!",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -300,27 +315,28 @@ private suspend fun spinWheel(
     viewModel: FortuneViewModel,
     rotation: Animatable<Float, *>,
     segments: List<FortuneSegment>,
-    onFinished: (FortuneReward?) -> Unit
+    onFinished: suspend (FortuneReward?) -> Unit
 ) {
+    // Always spin the wheel visually first, then resolve the reward.
+    // A null reward (e.g. profile not yet loaded) falls back to a random segment
+    // so the animation ALWAYS plays and the user is never left wondering why
+    // nothing happened.
     val reward = viewModel.spin()
-    if (reward == null) {
-        onFinished(null)
-        return
+
+    val index = if (reward != null) {
+        segments.indexOfFirst { sameReward(it.reward, reward) }.coerceAtLeast(0)
+    } else {
+        (segments.indices).random()
     }
 
-    val index = segments.indexOfFirst { sameReward(it.reward, reward) }.coerceAtLeast(0)
     val sweep = 360f / segments.size
-    
-    // Calculate the target angle so that the pointer (at -90 degrees) points to the center of the segment
-    // Segment 'index' occupies [index * sweep, (index + 1) * sweep]
-    // The current rotation puts segment 0 at [0, sweep]
-    // To make the pointer (fixed at -90) point at segment 'index', we need:
-    // (rotation + centerOfSegment) % 360 = 270 (which is same as -90)
-    
+
+    // Calculate the target angle so that the pointer (at top / -90°) lands on
+    // the centre of the winning segment.
     val centerAngleOfSegment = (index * sweep + sweep / 2f)
     val currentRotationMod = rotation.value % 360f
     val targetRotationDelta = 270f - (currentRotationMod + centerAngleOfSegment)
-    
+
     val finalTargetRotation = rotation.value + (360f * 6) + targetRotationDelta
 
     rotation.animateTo(

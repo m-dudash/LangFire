@@ -35,6 +35,34 @@ class HomeViewModel @Inject constructor(
         loadData()
     }
 
+    /** Call this to force a full data reload, e.g. when returning from FortuneWheel. */
+    fun refresh() {
+        refreshSilently()
+    }
+
+    /**
+     * Re-fetches only the fields that can change during a session
+     * (XP, multiplier, fortune availability, course stats) WITHOUT
+     * touching [isLoading], so the UI never flashes a spinner on resume.
+     */
+    private fun refreshSilently() {
+        viewModelScope.launch {
+            val profile = getProfileUseCase.invoke() ?: return@launch
+            _uiState.update {
+                it.copy(
+                    xp                    = profile.xp,
+                    xpMultiplier          = profile.xpMultiplier,
+                    xpMultiplierExpiresAt = profile.xpMultiplierExpiresAt,
+                    streakDays            = profile.streakDays,
+                )
+            }
+            checkFortuneAvailability(profile.id)
+
+            val courseId = _uiState.value.activeCourseId ?: return@launch
+            loadHomeCourseStats(profile.id, courseId)
+        }
+    }
+
     private fun loadData() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
