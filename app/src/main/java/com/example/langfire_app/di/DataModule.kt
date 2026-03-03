@@ -1,7 +1,10 @@
 package com.example.langfire_app.di
 
+import com.example.langfire_app.data.local.AppDatabase
 import com.example.langfire_app.data.local.dao.AppSettingsDao
 import com.example.langfire_app.data.local.dao.CourseDao
+import com.example.langfire_app.data.local.dao.UnitDao
+import com.example.langfire_app.data.local.dao.WordProgressDao
 import com.example.langfire_app.data.repository.CourseRepositoryImpl
 import com.example.langfire_app.data.repository.SettingsRepositoryImpl
 import com.example.langfire_app.domain.repository.CourseRepository
@@ -18,10 +21,16 @@ object DataModule {
 
     @Provides
     @Singleton
+    fun provideUnitDao(db: AppDatabase): UnitDao = db.unitDao()
+
+    @Provides
+    @Singleton
     fun provideCourseRepository(
-        courseDao: CourseDao
+        courseDao: CourseDao,
+        unitDao: UnitDao,
+        wordProgressDao: WordProgressDao
     ): CourseRepository {
-        return CourseRepositoryImpl(courseDao)
+        return CourseRepositoryImpl(courseDao, unitDao, wordProgressDao)
     }
 
     @Provides

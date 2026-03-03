@@ -113,15 +113,17 @@ class DebugSeeder @Inject constructor(
 
         courses.forEach { course ->
             val unitIds = mutableListOf<Int>()
-            for (unitIndex in 1..3) {
+            for (unitIndex in 1..6) {
                 val unitId = nextUnitId++
                 unitIds.add(unitId)
+                val levelId = unitIndex // 1:1 match with level id
                 insert(
                     db,
-                    "INSERT OR REPLACE INTO unit (id, name, course_id) VALUES (?, ?, ?)",
+                    "INSERT OR REPLACE INTO unit (id, name, course_id, level_id) VALUES (?, ?, ?, ?)",
                     unitId,
                     "Unit $unitIndex",
-                    course.id
+                    course.id,
+                    levelId
                 )
             }
             unitsByCourse[course.id] = unitIds
@@ -339,7 +341,7 @@ class DebugSeeder @Inject constructor(
         const val DEBUG_SEED_KEY = "debug_seed_v1"
         const val DEBUG_SEED_VERSION = "1"
         const val WORDS_PER_COURSE = 60
-        const val WORDS_PER_UNIT = 20
+        const val WORDS_PER_UNIT = 10
         const val WORDS_PER_LEVEL = 10
         const val DAY_MS = 24 * 60 * 60 * 1000L
         const val HOUR_MS = 60 * 60 * 1000L

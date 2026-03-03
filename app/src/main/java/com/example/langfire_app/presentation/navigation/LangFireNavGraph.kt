@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import com.example.langfire_app.presentation.library.LibraryScreen
 import com.example.langfire_app.presentation.screens.*
 
 @Composable
@@ -22,7 +21,16 @@ fun LangFireNavGraph(navController: NavHostController) {
             )
         }
         composable(Screen.Library.route) {
-            LibraryScreen()
+            LibraryScreen(
+                onBurnClick = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Home.route) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                },
+                onProfileClick = { navController.navigate(Screen.Profile.route) },
+                onLibraryClick = { navController.navigate(Screen.Library.route) }
+            )
         }
         composable(Screen.Session.route) {
             SessionScreen()
