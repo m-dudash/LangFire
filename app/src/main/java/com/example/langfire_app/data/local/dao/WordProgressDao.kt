@@ -4,6 +4,17 @@ import androidx.room.*
 import com.example.langfire_app.data.local.entities.WordLevelProgress
 import com.example.langfire_app.data.local.entities.WordProgressEntity
 
+/**
+ * A word item used in the stats bottom sheet, carries unit name.
+ */
+data class StatWordItem(
+    val wordId: Int,
+    val word: String,
+    val translation: String,
+    val unitName: String,
+    val knowledgeCoeff: Float?
+)
+
 @Dao
 interface WordProgressDao {
 
@@ -137,4 +148,92 @@ interface WordProgressDao {
         courseId: Int,
         threshold: Float = 0.85f
     ): Int
+
+    // ─── Stats Bottom Sheet Queries ───────────────────────────────────────────
+
+    /**
+     * Words the user has ever interacted with (marked / any progress) in a course.
+     * "To Learn" = has a progress record (i.e. queued for learning).
+     */
+    @Query("""
+        SELECT DISTINCT
+            w.id            AS wordId,
+            w.word          AS word,
+            COALESCE(wt.word, 'No translation') AS translation,
+            u.name          AS unitName,
+            wp.knowledge_coeff AS knowledgeCoeff
+        FROM word_progress wp
+        JOIN words w ON w.id = wp.word_id
+        JOIN unit u ON u.id = w.unit_id
+        LEFT JOIN translation tr
+            ON (tr.words_id_primary = w.id OR tr.words_id_secondary = w.id)
+        LEFT JOIN words wt
+            ON (wt.id = tr.words_id_primary OR wt.id = tr.words_id_secondary)
+            AND wt.id != w.id
+        WHERE wp.profile_id = :profileId
+          AND u.course_id   = :courseId
+        ORDER BY u.name ASC, w.word ASC
+    """)
+    suspend fun getToLearnWordsByCourse(
+        profileId: Int,
+        courseId: Int
+    ): List<StatWordItem>
+
+    /**
+     * Words with knowledge_coeff > practicedThreshold — "Practiced".
+     */
+    @Query("""
+        SELECT DISTINCT
+            w.id            AS wordId,
+            w.word          AS word,
+            COALESCE(wt.word, 'No translation') AS translation,
+            u.name          AS unitName,
+            wp.knowledge_coeff AS knowledgeCoeff
+        FROM word_progress wp
+        JOIN words w ON w.id = wp.word_id
+        JOIN unit u ON u.id = w.unit_id
+        LEFT JOIN translation tr
+            ON (tr.words_id_primary = w.id OR tr.words_id_secondary = w.id)
+        LEFT JOIN words wt
+            ON (wt.id = tr.words_id_primary OR wt.id = tr.words_id_secondary)
+            AND wt.id != w.id
+        WHERE wp.profile_id = :profileId
+          AND u.course_id   = :courseId
+          AND COALESCE(wp.knowledge_coeff, 0) > :practicedThreshold
+        ORDER BY u.name ASC, wp.knowledge_coeff DESC
+    """)
+    suspend fun getPracticedWordsByCourse(
+        profileId: Int,
+        courseId: Int,
+        practicedThreshold: Float = 0.30f
+    ): List<StatWordItem>
+
+    /**
+     * Words with knowledge_coeff >= learnedThreshold — "Learned".
+     */
+    @Query("""
+        SELECT DISTINCT
+            w.id            AS wordId,
+            w.word          AS word,
+            COALESCE(wt.word, 'No translation') AS translation,
+            u.name          AS unitName,
+            wp.knowledge_coeff AS knowledgeCoeff
+        FROM word_progress wp
+        JOIN words w ON w.id = wp.word_id
+        JOIN unit u ON u.id = w.unit_id
+        LEFT JOIN translation tr
+            ON (tr.words_id_primary = w.id OR tr.words_id_secondary = w.id)
+        LEFT JOIN words wt
+            ON (wt.id = tr.words_id_primary OR wt.id = tr.words_id_secondary)
+            AND wt.id != w.id
+        WHERE wp.profile_id = :profileId
+          AND u.course_id   = :courseId
+          AND COALESCE(wp.knowledge_coeff, 0) >= :learnedThreshold
+        ORDER BY u.name ASC, wp.knowledge_coeff DESC
+    """)
+    suspend fun getLearnedWordsByCourse(
+        profileId: Int,
+        courseId: Int,
+        learnedThreshold: Float = 0.85f
+    ): List<StatWordItem>
 }

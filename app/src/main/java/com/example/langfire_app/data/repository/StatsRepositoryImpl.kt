@@ -1,6 +1,7 @@
 package com.example.langfire_app.data.repository
 
 import com.example.langfire_app.data.local.dao.CourseDao
+import com.example.langfire_app.data.local.dao.StatWordItem
 import com.example.langfire_app.data.local.dao.WordProgressDao
 import com.example.langfire_app.domain.engine.GamificationEngine
 import com.example.langfire_app.domain.model.CourseLevelInfo
@@ -81,4 +82,13 @@ class StatsRepositoryImpl @Inject constructor(
             learned = learned
         )
     }
+
+    override suspend fun getToLearnWords(profileId: Int, courseId: Int): List<StatWordItem> =
+        wordProgressDao.getToLearnWordsByCourse(profileId, courseId)
+
+    override suspend fun getPracticedWords(profileId: Int, courseId: Int): List<StatWordItem> =
+        wordProgressDao.getPracticedWordsByCourse(profileId, courseId, practicedThreshold = 0.30f)
+
+    override suspend fun getLearnedWords(profileId: Int, courseId: Int): List<StatWordItem> =
+        wordProgressDao.getLearnedWordsByCourse(profileId, courseId, learnedThreshold = 0.85f)
 }

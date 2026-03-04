@@ -60,6 +60,10 @@ object DatabaseModule {
         return db.appSettingsDao()
     }
 
+    @Provides
+    fun provideWordsDao(db: AppDatabase): WordsDao {
+        return db.wordsDao()
+    }
 }
 
 /**

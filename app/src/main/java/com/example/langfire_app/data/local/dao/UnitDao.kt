@@ -28,4 +28,7 @@ interface UnitDao {
         profileId: Int,
         learnedThreshold: Float
     ): List<UnitWithStats>
+
+    @Query("SELECT * FROM unit WHERE id = :unitId")
+    suspend fun getUnitById(unitId: Int): com.example.langfire_app.data.local.entities.UnitEntity?
 }

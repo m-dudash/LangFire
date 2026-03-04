@@ -2,6 +2,7 @@ package com.example.langfire_app.presentation.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.langfire_app.data.local.dao.StatWordItem
 import com.example.langfire_app.domain.model.Course
 import com.example.langfire_app.domain.repository.CourseRepository
 import com.example.langfire_app.domain.repository.SettingsRepository
@@ -16,6 +17,8 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import com.example.langfire_app.domain.model.Behavior
 import com.example.langfire_app.domain.usecase.ProcessBehaviorUseCase
+
+enum class StatCategory { TO_LEARN, PRACTICED, LEARNED }
 
 
 @HiltViewModel
@@ -184,6 +187,39 @@ class HomeViewModel @Inject constructor(
             }
         }
     }
+
+    /** Open the stats bottom sheet for the given category and load its words. */
+    fun showStatSheet(category: StatCategory) {
+        viewModelScope.launch {
+            val profile = getProfileUseCase() ?: return@launch
+            val courseId = _uiState.value.activeCourseId ?: return@launch
+
+            _uiState.update {
+                it.copy(
+                    activeStatCategory = category,
+                    isStatSheetLoading = true,
+                    statSheetWords = emptyList()
+                )
+            }
+
+            val words = when (category) {
+                StatCategory.TO_LEARN  -> statsRepository.getToLearnWords(profile.id, courseId)
+                StatCategory.PRACTICED -> statsRepository.getPracticedWords(profile.id, courseId)
+                StatCategory.LEARNED   -> statsRepository.getLearnedWords(profile.id, courseId)
+            }
+
+            _uiState.update {
+                it.copy(
+                    isStatSheetLoading = false,
+                    statSheetWords = words
+                )
+            }
+        }
+    }
+
+    fun hideStatSheet() {
+        _uiState.update { it.copy(activeStatCategory = null, statSheetWords = emptyList()) }
+    }
 }
 
 data class HomeUiState(
@@ -205,4 +241,8 @@ data class HomeUiState(
     val xpMultiplier: Int = 1,
     val xpMultiplierExpiresAt: Long? = null,
     val isFortuneWheelAvailable: Boolean = true,
+    // Stats Bottom Sheet
+    val activeStatCategory: StatCategory? = null,
+    val statSheetWords: List<StatWordItem> = emptyList(),
+    val isStatSheetLoading: Boolean = false,
 )

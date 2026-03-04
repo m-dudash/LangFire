@@ -6,13 +6,16 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.outlined.LibraryBooks
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Whatshot
@@ -27,6 +30,9 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -38,9 +44,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import com.example.langfire_app.data.local.dao.StatWordItem
 import com.example.langfire_app.domain.model.Course
 import com.example.langfire_app.presentation.ui.theme.*
 import com.example.langfire_app.presentation.viewmodels.HomeViewModel
+import com.example.langfire_app.presentation.viewmodels.StatCategory
 import kotlin.math.cos
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -147,7 +155,8 @@ fun HomeScreen(
                             label = "To Learn",
                             color = Color.Gray,
                             containerColor = Color.LightGray.copy(alpha=0.3f),
-                            progress = 1f
+                            progress = 1f,
+                            onClick = { requireProfile { viewModel.showStatSheet(StatCategory.TO_LEARN) } }
                         )
                         
                         // 2. Practiced
@@ -156,7 +165,8 @@ fun HomeScreen(
                             label = "Practiced",
                             color = Color(0xFFFF9800),
                             containerColor = Color(0xFFFFE0B2),
-                            progress = if(toLearn > 0) practiced.toFloat() / toLearn else 0f
+                            progress = if(toLearn > 0) practiced.toFloat() / toLearn else 0f,
+                            onClick = { requireProfile { viewModel.showStatSheet(StatCategory.PRACTICED) } }
                         )
                         
                         // 3. Learned
@@ -165,7 +175,8 @@ fun HomeScreen(
                             label = "Learned",
                             color = Color(0xFFFF3D00),
                             containerColor = Color(0xFFFFCCBC),
-                            progress = if(practiced > 0) learned.toFloat() / practiced else 0f
+                            progress = if(practiced > 0) learned.toFloat() / practiced else 0f,
+                            onClick = { requireProfile { viewModel.showStatSheet(StatCategory.LEARNED) } }
                         )
                     }
                 }
@@ -193,6 +204,23 @@ fun HomeScreen(
                     onClick = { requireProfile { viewModel.onBurnClick(); onBurnClick() } }
                 )
             }
+        }
+    }
+
+    // ── Stats Bottom Sheet ────────────────────────────────────────────
+    if (state.activeStatCategory != null) {
+        val statSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.hideStatSheet() },
+            sheetState       = statSheetState,
+            containerColor   = MaterialTheme.colorScheme.surface,
+            dragHandle       = { BottomSheetDefaults.DragHandle() }
+        ) {
+            StatsWordsBottomSheet(
+                category  = state.activeStatCategory!!,
+                words     = state.statSheetWords,
+                isLoading = state.isStatSheetLoading
+            )
         }
     }
 
@@ -567,15 +595,14 @@ private fun FlameWithStreak(streakDays: Int, onClick: () -> Unit = {}) {
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 4.dp, bottom = 10.dp),
+                .padding(start = 4.dp, bottom = 3.dp),
             horizontalAlignment = Alignment.Start
         ) {
             Text(
                 text = streakDays.toString(),
-                fontSize = 96.sp, // Made bigger
+                fontSize = 180.sp,
                 fontWeight = FontWeight.Black,
                 color = if (isStreakBroken) Color.Gray else MaterialTheme.colorScheme.onBackground,
-                lineHeight = 90.sp
             )
             Text(
                 text = "day streak",
@@ -927,9 +954,16 @@ private fun SmallProgressRing(
     color: Color,
     containerColor: Color,
     progress: Float,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null
 ) {
-    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        modifier = modifier
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .clip(RoundedCornerShape(12.dp))
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         val size = 72.dp // Increased size
         Box(modifier = Modifier.size(size), contentAlignment = Alignment.Center) {
             Canvas(Modifier.fillMaxSize()) {
@@ -967,6 +1001,209 @@ private fun SmallProgressRing(
             fontSize = 12.sp, // Larger font
             fontWeight = FontWeight.SemiBold
         )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STATS WORDS BOTTOM SHEET
+// ─────────────────────────────────────────────────────────────────────────────
+@Composable
+private fun StatsWordsBottomSheet(
+    category: StatCategory,
+    words: List<StatWordItem>,
+    isLoading: Boolean
+) {
+    val titleColor = when (category) {
+        StatCategory.TO_LEARN  -> Color.Gray
+        StatCategory.PRACTICED -> Color(0xFFFF9800)
+        StatCategory.LEARNED   -> Color(0xFFFF3D00)
+    }
+    val title = when (category) {
+        StatCategory.TO_LEARN  -> "To Learn"
+        StatCategory.PRACTICED -> "Practiced"
+        StatCategory.LEARNED   -> "Learned"
+    }
+    val emoji = when (category) {
+        StatCategory.TO_LEARN  -> "📚"
+        StatCategory.PRACTICED -> "🔥"
+        StatCategory.LEARNED   -> "✅"
+    }
+
+    // Consume leftover upward scroll so the sheet can't be dragged above its
+    // expanded position and won't snap/bounce back.
+    val noUpStretchConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset = if (available.y < 0f) available else Offset.Zero
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .nestedScroll(noUpStretchConnection)
+            .padding(horizontal = 20.dp)
+            .padding(bottom = 32.dp)
+    ) {
+        // Header
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+        ) {
+            Text(text = emoji, fontSize = 26.sp)
+            Column {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = titleColor
+                )
+                Text(
+                    text = "${words.size} words",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+        Spacer(Modifier.height(8.dp))
+
+        when {
+            isLoading -> {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(200.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = FireOrange, strokeWidth = 3.dp)
+                }
+            }
+            words.isEmpty() -> {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(160.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(text = "🌱", fontSize = 36.sp)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = "No words here yet",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "Start exploring to fill this list!",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+            }
+            else -> {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 520.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(words, key = { it.wordId }) { item ->
+                        StatWordRow(item = item, accentColor = titleColor)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatWordRow(
+    item: StatWordItem,
+    accentColor: Color
+) {
+    val coeff = item.knowledgeCoeff
+    val progressPercent = if (coeff != null) (coeff * 100).toInt() else null
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        tonalElevation = 0.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Left accent bar
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(accentColor)
+            )
+
+            // Word & translation
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.word,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = item.translation,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+                Spacer(Modifier.height(4.dp))
+                // Unit chip
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = accentColor.copy(alpha = 0.12f)
+                ) {
+                    Text(
+                        text = item.unitName,
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = accentColor,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        maxLines = 1
+                    )
+                }
+            }
+
+            // Progress % (if available)
+            if (progressPercent != null) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "$progressPercent%",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = accentColor
+                    )
+                }
+            }
+
+            // Sound button (placeholder)
+            IconButton(
+                onClick = { /* TODO: play word audio */ },
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.VolumeUp,
+                    contentDescription = "Listen to ${ item.word }",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
     }
 }
 

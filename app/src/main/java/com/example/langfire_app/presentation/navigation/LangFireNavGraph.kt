@@ -29,7 +29,16 @@ fun LangFireNavGraph(navController: NavHostController) {
                     }
                 },
                 onProfileClick = { navController.navigate(Screen.Profile.route) },
-                onLibraryClick = { navController.navigate(Screen.Library.route) }
+                onLibraryClick = { navController.navigate(Screen.Library.route) },
+                onUnitClick = { unitId -> navController.navigate(Screen.UnitDetails.createRoute(unitId)) }
+            )
+        }
+        composable(
+            route = Screen.UnitDetails.route,
+            arguments = listOf(androidx.navigation.navArgument("unitId") { type = androidx.navigation.NavType.IntType })
+        ) {
+            UnitDetailsScreen(
+                onBackClick = { navController.popBackStack() }
             )
         }
         composable(Screen.Session.route) {
