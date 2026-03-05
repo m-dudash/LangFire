@@ -104,4 +104,10 @@ abstract class RepositoryModule {
     abstract fun bindStatsRepository(
         impl: StatsRepositoryImpl
     ): StatsRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindLearnRepository(
+        impl: LearnRepositoryImpl
+    ): LearnRepository
 }

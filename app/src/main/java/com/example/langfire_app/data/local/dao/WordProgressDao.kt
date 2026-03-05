@@ -15,6 +15,23 @@ data class StatWordItem(
     val knowledgeCoeff: Float?
 )
 
+/**
+ * A word item loaded for an SRS learning session.
+ * Contains all fields needed to show the flashcard and update SM-2 state.
+ */
+data class SessionWordItem(
+    val wordId: Int,
+    val word: String,
+    val translation: String,
+    val knowledgeCoeff: Float?,
+    val nextReviewAt: Long?,
+    val srsInterval: Int?,
+    val srsEaseFactor: Float?,
+    val srsRepetition: Int?,
+    val correctCount: Int?,
+    val incorrectCount: Int?
+)
+
 @Dao
 interface WordProgressDao {
 
@@ -236,4 +253,59 @@ interface WordProgressDao {
         courseId: Int,
         learnedThreshold: Float = 0.85f
     ): List<StatWordItem>
+
+    // ─── SRS Session Query ────────────────────────────────────────────────────
+
+    /**
+     * Selects words for a learning session using SRS scheduling.
+     *
+     * Priority order:
+     *  1. Completely new words (no progress record) – so the user always sees fresh vocab
+     *  2. Overdue words (nextReviewAt <= now) ordered by how overdue they are (most overdue first)
+     *  3. Words due today
+     *
+     * Words with knowledge_coeff >= 0.95 (fully learned) are excluded from new sessions
+     * but still show up if they are overdue (to maintain long-term retention).
+     */
+    @Query("""
+        SELECT
+            w.id                AS wordId,
+            w.word              AS word,
+            COALESCE(wt.word, '') AS translation,
+            wp.knowledge_coeff  AS knowledgeCoeff,
+            wp.next_review_at   AS nextReviewAt,
+            wp.srs_interval     AS srsInterval,
+            wp.srs_ease_factor  AS srsEaseFactor,
+            wp.srs_repetition   AS srsRepetition,
+            wp.correct_count    AS correctCount,
+            wp.incorrect_count  AS incorrectCount
+        FROM words w
+        JOIN unit u ON u.id = w.unit_id
+        LEFT JOIN translation tr
+            ON (tr.words_id_primary = w.id OR tr.words_id_secondary = w.id)
+        LEFT JOIN words wt
+            ON (wt.id = tr.words_id_primary OR wt.id = tr.words_id_secondary)
+            AND wt.id != w.id
+        LEFT JOIN word_progress wp
+            ON wp.word_id = w.id AND wp.profile_id = :profileId
+        WHERE u.course_id = :courseId
+          AND (
+                -- New word: profile has it marked for learning (coeff = 0.0) or there's a progress record that is due
+                (wp.knowledge_coeff IS NOT NULL AND wp.knowledge_coeff < 0.95 AND (wp.next_review_at IS NULL OR wp.next_review_at <= :nowMs))
+             OR
+                -- Word explicitly queued (coeff = 0) that hasn't been reviewed yet
+                (wp.knowledge_coeff IS NOT NULL AND wp.knowledge_coeff = 0.0 AND wp.srs_repetition = 0)
+          )
+        GROUP BY w.id
+        ORDER BY
+            CASE WHEN wp.srs_repetition IS NULL OR wp.srs_repetition = 0 THEN 0 ELSE 1 END ASC,
+            (:nowMs - COALESCE(wp.next_review_at, 0)) DESC
+        LIMIT :limit
+    """)
+    suspend fun getWordsForSession(
+        profileId: Int,
+        courseId: Int,
+        nowMs: Long,
+        limit: Int = 20
+    ): List<SessionWordItem>
 }
