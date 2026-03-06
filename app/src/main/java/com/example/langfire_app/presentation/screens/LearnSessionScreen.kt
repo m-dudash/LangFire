@@ -6,27 +6,38 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.VolumeUp
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import android.media.RingtoneManager
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import com.example.langfire_app.data.local.dao.SessionWordItem
 import com.example.langfire_app.domain.srs.SrsEngine
 import com.example.langfire_app.presentation.ui.theme.*
 import com.example.langfire_app.presentation.viewmodels.*
@@ -42,7 +53,7 @@ fun SessionScreen(
     AnimatedContent(
         targetState = state.sessionPhase,
         transitionSpec = {
-            fadeIn(tween(300)) togetherWith fadeOut(tween(300))
+            fadeIn(tween(400)) togetherWith fadeOut(tween(400))
         },
         label = "SessionPhaseTransition"
     ) { phase ->
@@ -53,9 +64,8 @@ fun SessionScreen(
                 onStart   = viewModel::startSession
             )
             SessionPhase.STUDYING -> SessionStudyScreen(
-                state   = state,
-                onReveal = viewModel::revealCard,
-                onAnswer = viewModel::answer
+                state     = state,
+                viewModel = viewModel
             )
             SessionPhase.FINISHED -> SessionFinishedScreen(
                 correctCount = state.correctCount,
@@ -68,7 +78,7 @@ fun SessionScreen(
     }
 }
 
-// ─── Loading ─────────────────────────────────────────────────────────────────
+// ─── Loading & Empty Screens ──────────────────────────────────────────────────
 
 @Composable
 private fun SessionLoadingScreen() {
@@ -78,11 +88,9 @@ private fun SessionLoadingScreen() {
             .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
-        CircularProgressIndicator(color = FireOrange)
+        CircularProgressIndicator(color = FireOrange, strokeWidth = 5.dp, modifier = Modifier.size(64.dp))
     }
 }
-
-// ─── Empty state ─────────────────────────────────────────────────────────────
 
 @Composable
 private fun SessionEmptyScreen() {
@@ -97,27 +105,28 @@ private fun SessionEmptyScreen() {
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(32.dp)
         ) {
-            Text("🎉", fontSize = 72.sp)
-            Spacer(modifier = Modifier.height(20.dp))
+            Text("🎉", fontSize = 96.sp)
+            Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = "No words to review!",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
+                text = "All Caught Up!",
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Black,
                 color = MaterialTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "Go to Library and mark words to learn, then come back!",
-                style = MaterialTheme.typography.bodyMedium,
+                text = "You've reviewed all due words. Go to the Library to add more words to your learning queue.",
+                style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                lineHeight = 24.sp
             )
         }
     }
 }
 
-// ─── Intro ───────────────────────────────────────────────────────────────────
+// ─── Intro Screen ─────────────────────────────────────────────────────────────
 
 @Composable
 private fun SessionIntroScreen(wordCount: Int, onStart: () -> Unit) {
@@ -130,224 +139,666 @@ private fun SessionIntroScreen(wordCount: Int, onStart: () -> Unit) {
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(24.dp)
+            modifier = Modifier.padding(32.dp)
         ) {
-            // Animated fire emoji
             val infiniteTransition = rememberInfiniteTransition(label = "fireAnim")
             val scale by infiniteTransition.animateFloat(
                 initialValue = 1f, targetValue = 1.08f,
                 animationSpec = infiniteRepeatable(
-                    animation = tween(700, easing = FastOutSlowInEasing),
+                    animation = tween(800, easing = FastOutSlowInEasing),
                     repeatMode = RepeatMode.Reverse
                 ),
                 label = "firePulse"
             )
 
-            Text("🔥", fontSize = 80.sp, modifier = Modifier.scale(scale))
-            Spacer(modifier = Modifier.height(24.dp))
+            Text("🔥", fontSize = 100.sp, modifier = Modifier.scale(scale))
+            Spacer(modifier = Modifier.height(32.dp))
             Text(
                 "Burn Session",
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Black,
-                color = Color.White
+                color = Color.White,
+                fontSize = 36.sp
             )
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                "$wordCount words to master today.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = Color.White.copy(alpha = 0.85f)
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Word count chips
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SessionInfoChip(label = "Cards", value = "$wordCount")
-                SessionInfoChip(label = "Mode", value = "Flashcard")
+            Surface(
+                color = Color.White.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.padding(top = 8.dp)
+            ) {
+                Text(
+                    "$wordCount EXERCISES TODAY",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                    letterSpacing = 1.5.sp
+                )
             }
-
-            Spacer(modifier = Modifier.height(48.dp))
+            
+            Spacer(modifier = Modifier.height(64.dp))
             Button(
                 onClick = onStart,
                 colors = ButtonDefaults.buttonColors(containerColor = Color.White),
                 shape = CircleShape,
                 modifier = Modifier
-                    .height(60.dp)
-                    .fillMaxWidth(0.7f)
+                    .height(64.dp)
+                    .fillMaxWidth(0.85f)
+                    .shadow(16.dp, CircleShape, spotColor = Color.White.copy(alpha = 0.5f))
             ) {
                 Text(
                     "LET'S BURN IT!",
                     color = FireOrangeDeep,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 16.sp
+                    fontWeight = FontWeight.Black,
+                    fontSize = 18.sp,
+                    letterSpacing = 1.sp
                 )
             }
         }
     }
 }
 
-@Composable
-private fun SessionInfoChip(label: String, value: String) {
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = Color.White.copy(alpha = 0.2f)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
-            Text(value, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.White)
-        }
-    }
-}
-
-// ─── Study (main flashcard loop) ─────────────────────────────────────────────
+// ─── Study / Main Router Screen ───────────────────────────────────────────────
 
 @Composable
 private fun SessionStudyScreen(
     state: LearnUiState,
-    onReveal: () -> Unit,
-    onAnswer: (SrsEngine.Quality) -> Unit
+    viewModel: LearnViewModel
 ) {
-    val word = state.currentWord ?: return
+    val exercise = state.currentExercise ?: return
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .statusBarsPadding()
-            .padding(horizontal = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { viewModel.skipDelay() }
     ) {
-        Spacer(modifier = Modifier.height(16.dp))
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .height(280.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(FireOrange.copy(alpha = 0.25f), Color.Transparent)
+                    )
+                )
+        )
 
-        // Progress bar + counter
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(280.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, FireOrange.copy(alpha = 0.25f))
+                    )
+                )
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Progress bar + counter
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             LinearProgressIndicator(
                 progress = { state.progress },
                 modifier = Modifier
                     .weight(1f)
-                    .height(8.dp)
+                    .height(10.dp)
                     .clip(CircleShape),
                 color = FireOrange,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
-            Text(
-                text = "${state.currentIndex + 1} / ${state.totalInSession}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        // Flashcard
-        AnimatedContent(
-            targetState = word.wordId,
-            transitionSpec = {
-                (slideInHorizontally { it / 2 } + fadeIn()) togetherWith
-                        (slideOutHorizontally { -it / 2 } + fadeOut())
-            },
-            label = "CardTransition"
-        ) {
-            FlipCard(
-                word        = word.word,
-                translation = word.translation.ifBlank { "—" },
-                isRevealed  = state.cardPhase == CardPhase.REVEALED,
-                onClick     = onReveal
-            )
-        }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        // Action buttons — only shown after flip
-        AnimatedVisibility(
-            visible = state.cardPhase == CardPhase.REVEALED,
-            enter   = fadeIn() + expandVertically(),
-            exit    = fadeOut() + shrinkVertically()
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant
+            ) {
                 Text(
-                    text = "How well did you know it?",
+                    text = "${state.currentIndex + 1} / ${state.totalInSession}",
                     style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Black,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Exercise Component Router
+        Box(
+            modifier = Modifier.weight(1f),
+            contentAlignment = Alignment.Center
+        ) {
+            AnimatedContent(
+                targetState = exercise,
+                transitionSpec = {
+                    (slideInHorizontally { it / 2 } + fadeIn(tween(300))) togetherWith
+                            (slideOutHorizontally { -it / 2 } + fadeOut(tween(300)))
+                },
+                label = "ExerciseTransition"
+            ) { currentExercise ->
+                when (currentExercise.type) {
+                    ExerciseType.FLASHCARD_L1 -> FlashcardExercise(state, viewModel, currentExercise, showNativeFirst = true)
+                    ExerciseType.FLASHCARD_L2 -> FlashcardExercise(state, viewModel, currentExercise, showNativeFirst = false)
+                    ExerciseType.LISTENING_FLIP -> ListeningFlipExercise(state, viewModel, currentExercise)
+                    ExerciseType.TRANSLATE_L1 -> MultipleChoiceExercise(state, viewModel, currentExercise, showWord = true)
+                    ExerciseType.TRANSLATE_L2 -> MultipleChoiceExercise(state, viewModel, currentExercise, showWord = false)
+                    ExerciseType.LISTENING_CHOOSE -> ListeningChoiceExercise(state, viewModel, currentExercise)
+                    ExerciseType.LISTENING_TYPE -> ListeningTypeExercise(state, viewModel, currentExercise)
+                    ExerciseType.MATCHING -> MatchingExercise(state, viewModel, currentExercise)
+                }
+            }
+        }
+        
+            Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+}
+
+// ─── Individual Exercise Components ───────────────────────────────────────────
+
+// 1. Flashcard
+@Composable
+private fun FlashcardExercise(state: LearnUiState, viewModel: LearnViewModel, exercise: ExerciseItem, showNativeFirst: Boolean) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+        FlipCard(
+            item        = exercise.word,
+            isRevealed  = state.cardPhase == CardPhase.REVEALED,
+            blurContent = false,
+            audioOnlyFront = false,
+            showNativeFirst = showNativeFirst,
+            onClick     = viewModel::revealCard
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Box(modifier = Modifier.height(120.dp), contentAlignment = Alignment.Center) {
+            this@Column.AnimatedVisibility(
+                visible = state.cardPhase == CardPhase.REVEALED,
+                enter   = fadeIn() + scaleIn(initialScale = 0.9f),
+                exit    = fadeOut() + scaleOut(targetScale = 0.9f)
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "How well did you know it?",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        SrsButton(Icons.Default.Close, "Forgot", Color(0xFFF44336), Color(0xFFFFEBEE)) { viewModel.answer(SrsEngine.Quality.FORGOT) }
+                        SrsButton(Icons.Default.Done, "Got It", EmeraldGreen, Color(0xFFE8F5E9)) { viewModel.answer(SrsEngine.Quality.GOOD) }
+                        SrsButton(Icons.Default.Star, "Easy", GoldXP, Color(0xFFFFF8E1)) { viewModel.answer(SrsEngine.Quality.EASY) }
+                    }
+                }
+            }
+
+            this@Column.AnimatedVisibility(
+                visible = state.cardPhase == CardPhase.FRONT,
+                enter   = fadeIn(),
+                exit    = fadeOut()
+            ) {
+                Text(
+                    text = "Tap the card to reveal translation",
+                    style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = FontWeight.Medium
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+    }
+}
+
+// 1b. Listening Flip
+@Composable
+private fun ListeningFlipExercise(state: LearnUiState, viewModel: LearnViewModel, exercise: ExerciseItem) {
+    val context = LocalContext.current
+    
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+        
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        FlipCard(
+            item        = exercise.word,
+            isRevealed  = state.cardPhase == CardPhase.REVEALED,
+            blurContent = false, 
+            audioOnlyFront = true,
+            showNativeFirst = false,
+            onClick     = viewModel::revealCard
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Box(modifier = Modifier.height(120.dp), contentAlignment = Alignment.Center) {
+            this@Column.AnimatedVisibility(
+                visible = state.cardPhase == CardPhase.REVEALED,
+                enter   = fadeIn() + scaleIn(initialScale = 0.9f),
+                exit    = fadeOut() + scaleOut(targetScale = 0.9f)
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    AnswerButton(
-                        icon     = Icons.Default.Close,
-                        label    = "Forgot",
-                        color    = Color(0xFFE53935),
-                        onClick  = { onAnswer(SrsEngine.Quality.FORGOT) }
-                    )
-                    AnswerButton(
-                        icon     = Icons.Default.Done,
-                        label    = "Got it",
-                        color    = EmeraldGreen,
-                        onClick  = { onAnswer(SrsEngine.Quality.GOOD) }
-                    )
-                    AnswerButton(
-                        icon     = Icons.Default.Star,
-                        label    = "Easy!",
-                        color    = GoldXP,
-                        onClick  = { onAnswer(SrsEngine.Quality.EASY) }
-                    )
+                    SrsButton(Icons.Default.Close, "Forgot", Color(0xFFF44336), Color(0xFFFFEBEE)) { viewModel.answer(SrsEngine.Quality.FORGOT) }
+                    SrsButton(Icons.Default.Done, "Got It", EmeraldGreen, Color(0xFFE8F5E9)) { viewModel.answer(SrsEngine.Quality.GOOD) }
+                    SrsButton(Icons.Default.Star, "Easy", GoldXP, Color(0xFFFFF8E1)) { viewModel.answer(SrsEngine.Quality.EASY) }
                 }
             }
-        }
 
-        // Hint text — shown before flip
-        AnimatedVisibility(
-            visible = state.cardPhase == CardPhase.FRONT,
-            enter   = fadeIn(),
-            exit    = fadeOut()
-        ) {
-            Text(
-                text = "Tap the card to reveal translation",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
+            this@Column.AnimatedVisibility(
+                visible = state.cardPhase == CardPhase.FRONT,
+                enter   = fadeIn(),
+                exit    = fadeOut()
+            ) {
+                Text(
+                    text = "Tap the card to reveal answer",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
-
-        Spacer(modifier = Modifier.height(28.dp))
     }
 }
 
-// ─── Flashcard ───────────────────────────────────────────────────────────────
+
+// 2. Multiple Choice (Translate L1 or L2)
+@Composable
+private fun MultipleChoiceExercise(state: LearnUiState, viewModel: LearnViewModel, exercise: ExerciseItem, showWord: Boolean) {
+    val promptText = if (showWord) exercise.word.word else exercise.word.translation
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = if (showWord) "Translate this word" else "How do you say...",
+            style = MaterialTheme.typography.labelLarge,
+            color = FireOrange,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = promptText,
+            style = MaterialTheme.typography.displayMedium,
+            fontWeight = FontWeight.Black,
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(48.dp))
+
+        exercise.options.forEach { option ->
+            val optionText = if (showWord) option.translation else option.word
+            val isCorrectOption = state.cardPhase == CardPhase.REVEALED && option.wordId == exercise.word.wordId
+            val isSelectedAndWrong = state.cardPhase == CardPhase.REVEALED && state.selectedWordId == option.wordId && option.wordId != exercise.word.wordId
+            val containerColor = when {
+                isSelectedAndWrong -> Color(0xFFEF9A9A)
+                isCorrectOption -> FireOrange.copy(alpha = 0.15f)
+                else -> MaterialTheme.colorScheme.surface
+            }
+            val contentColor = when {
+                isSelectedAndWrong -> Color(0xFFB71C1C)
+                isCorrectOption -> FireOrangeDeep
+                else -> MaterialTheme.colorScheme.onSurface
+            }
+            val borderWidth = if (state.cardPhase == CardPhase.FRONT) 1.dp else if (isCorrectOption || isSelectedAndWrong) 2.dp else 0.dp
+            val borderColor = when {
+                isSelectedAndWrong -> Color(0xFFE53935)
+                isCorrectOption -> FireOrange
+                state.cardPhase == CardPhase.FRONT -> MaterialTheme.colorScheme.outlineVariant
+                else -> Color.Transparent
+            }
+            
+            OutlinedButton(
+                onClick = { if (state.cardPhase == CardPhase.FRONT) viewModel.answerMultipleChoice(option.wordId) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp)
+                    .height(64.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = containerColor,
+                    contentColor = contentColor
+                ),
+                border = androidx.compose.foundation.BorderStroke(borderWidth, borderColor)
+            ) {
+                Text(optionText, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+// 3. Listening Choose
+@Composable
+private fun ListeningChoiceExercise(state: LearnUiState, viewModel: LearnViewModel, exercise: ExerciseItem) {
+    val context = LocalContext.current
+    
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+        Text("What did you hear?", style = MaterialTheme.typography.labelLarge, color = FireOrange, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        Surface(
+            shape = CircleShape,
+            color = FireOrangeDeep,
+            modifier = Modifier
+                .size(140.dp)
+                .clickable { playTestSound(context) }
+                .shadow(16.dp, CircleShape, spotColor = FireOrange.copy(alpha = 0.5f))
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(Icons.Rounded.VolumeUp, contentDescription = "Listen", tint = Color.White, modifier = Modifier.size(64.dp))
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(48.dp))
+
+        exercise.options.forEach { option ->
+            val isCorrectOption = state.cardPhase == CardPhase.REVEALED && option.wordId == exercise.word.wordId
+            val isSelectedAndWrong = state.cardPhase == CardPhase.REVEALED && state.selectedWordId == option.wordId && option.wordId != exercise.word.wordId
+            val containerColor = when {
+                isSelectedAndWrong -> Color(0xFFEF9A9A)
+                isCorrectOption -> FireOrange.copy(alpha = 0.15f)
+                else -> MaterialTheme.colorScheme.surface
+            }
+            val contentColor = when {
+                isSelectedAndWrong -> Color(0xFFB71C1C)
+                isCorrectOption -> FireOrangeDeep
+                else -> MaterialTheme.colorScheme.onSurface
+            }
+            val borderWidth = if (state.cardPhase == CardPhase.FRONT) 1.dp else if (isCorrectOption || isSelectedAndWrong) 2.dp else 0.dp
+            val borderColor = when {
+                isSelectedAndWrong -> Color(0xFFE53935)
+                isCorrectOption -> FireOrange
+                state.cardPhase == CardPhase.FRONT -> MaterialTheme.colorScheme.outlineVariant
+                else -> Color.Transparent
+            }
+
+            OutlinedButton(
+                onClick = { if (state.cardPhase == CardPhase.FRONT) viewModel.answerMultipleChoice(option.wordId) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp)
+                    .height(64.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = containerColor,
+                    contentColor = contentColor
+                ),
+                border = androidx.compose.foundation.BorderStroke(borderWidth, borderColor)
+            ) {
+                Text(option.translation, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+// 4. Listening Type
+@Composable
+private fun ListeningTypeExercise(state: LearnUiState, viewModel: LearnViewModel, exercise: ExerciseItem) {
+    val context = LocalContext.current
+    
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+        Text("Type what you hear", style = MaterialTheme.typography.labelLarge, color = FireOrange, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        Surface(
+            shape = CircleShape,
+            color = FireOrangeDeep,
+            modifier = Modifier
+                .size(110.dp)
+                .clickable { playTestSound(context) }
+                .shadow(16.dp, CircleShape, spotColor = FireOrange.copy(alpha = 0.5f))
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(Icons.Rounded.VolumeUp, contentDescription = "Listen", tint = Color.White, modifier = Modifier.size(52.dp))
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        // Empty spacer where the blurred hint used to be
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        OutlinedTextField(
+            value = state.typedText,
+            onValueChange = { if (state.cardPhase == CardPhase.FRONT) viewModel.setTypedText(it) },
+            modifier = Modifier.fillMaxWidth().height(72.dp),
+            shape = RoundedCornerShape(20.dp),
+            placeholder = { Text("Enter word...", fontSize = 20.sp) },
+            singleLine = true,
+            textStyle = MaterialTheme.typography.titleLarge.copy(textAlign = TextAlign.Center),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                focusedIndicatorColor = FireOrange,
+                unfocusedIndicatorColor = MaterialTheme.colorScheme.outlineVariant
+            ),
+            isError = state.isTypeCorrect == false
+        )
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        if (state.cardPhase == CardPhase.REVEALED) {
+            val isCorrect = state.isTypeCorrect == true
+            
+            Surface(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = if (isCorrect) EmeraldGreen.copy(alpha = 0.15f) else Color(0xFFEF9A9A).copy(alpha = 0.2f),
+                border = androidx.compose.foundation.BorderStroke(2.dp, if (isCorrect) EmeraldGreen else Color(0xFFE53935))
+            ) {
+                Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = if (isCorrect) "Awesome! Correct answer 🎉" else "Almost there! Keep trying",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (isCorrect) EmeraldGreen else Color(0xFFE53935),
+                        fontWeight = FontWeight.Bold 
+                    )
+                    if (!isCorrect) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Correct: ${exercise.word.word}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = viewModel::proceedTypeInput,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = FireOrangeDeep)
+            ) {
+                Text("CONTINUE", fontWeight = FontWeight.Black, fontSize = 20.sp, letterSpacing = 1.sp)
+            }
+        } else {
+            Button(
+                onClick = viewModel::answerTypeInput,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = FireOrangeDeep)
+            ) {
+                Text("CHECK", fontWeight = FontWeight.Black, fontSize = 20.sp, letterSpacing = 1.sp)
+            }
+            Spacer(modifier = Modifier.height(32.dp)) // padding placeholder to match button height diff
+        }
+    }
+}
+
+// 5. Matching Exercise
+@Composable
+private fun MatchingExercise(state: LearnUiState, viewModel: LearnViewModel, exercise: ExerciseItem) {
+    var pairsLeft by remember { mutableStateOf(exercise.options) }
+    var errors by remember { mutableStateOf(0) }
+    
+    val wordCards by remember { mutableStateOf(exercise.options.map { it.wordId to it.word }.shuffled()) }
+    val transCards by remember { mutableStateOf(exercise.options.map { it.wordId to it.translation }.shuffled()) }
+    
+    var selectedWordId by remember { mutableStateOf<Int?>(null) }
+    var selectedTransId by remember { mutableStateOf<Int?>(null) }
+    
+    var matchedIds by remember { mutableStateOf(setOf<Int>()) }
+    var errorPair by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(selectedWordId, selectedTransId) {
+        if (selectedWordId != null && selectedTransId != null) {
+            val wid = selectedWordId!!
+            val tid = selectedTransId!!
+            
+            if (wid == tid) {
+                // Correct match
+                matchedIds = matchedIds + wid
+                pairsLeft = pairsLeft.filter { it.wordId != wid }
+                
+                if (pairsLeft.isEmpty()) {
+                    delay(300)
+                    viewModel.answerMatchingCompleted(errors)
+                }
+            } else {
+                // Wrong match
+                errors++
+                errorPair = wid to tid
+                coroutineScope.launch {
+                    delay(400)
+                    if (errorPair == wid to tid) errorPair = null
+                }
+            }
+            selectedWordId = null
+            selectedTransId = null
+        }
+    }
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+        Text("Match the pairs", style = MaterialTheme.typography.labelLarge, color = FireOrange, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            // Words Column
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                wordCards.forEach { (id, text) ->
+                    val isMatched = id in matchedIds
+                    val isSelected = id == selectedWordId
+                    val isError = errorPair?.first == id
+                    
+                    val bgColor = when {
+                        isError -> Color(0xFFEF9A9A) // Light Red
+                        isMatched || isSelected -> FireOrange.copy(alpha = 0.15f)
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    }
+                    val borderColor = when {
+                        isError -> Color(0xFFE53935)
+                        isMatched || isSelected -> FireOrange
+                        else -> Color.Transparent
+                    }
+                    
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(90.dp)
+                            .clickable(enabled = !isMatched) { selectedWordId = id },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = bgColor),
+                        border = androidx.compose.foundation.BorderStroke(if (isError || isMatched || isSelected) 2.dp else 0.dp, borderColor)
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize().padding(12.dp)) {
+                            Text(text, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = if (isMatched || isSelected) FireOrangeDeep else MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.Center)
+                        }
+                    }
+                }
+            }
+            // Translations Column
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                transCards.forEach { (id, text) ->
+                    val isMatched = id in matchedIds
+                    val isSelected = id == selectedTransId
+                    val isError = errorPair?.second == id
+                    
+                    val bgColor = when {
+                        isError -> Color(0xFFEF9A9A) // Light Red
+                        isMatched || isSelected -> FireOrange.copy(alpha = 0.15f)
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    }
+                    val borderColor = when {
+                        isError -> Color(0xFFE53935)
+                        isMatched || isSelected -> FireOrange
+                        else -> Color.Transparent
+                    }
+                    
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(90.dp)
+                            .clickable(enabled = !isMatched) { selectedTransId = id },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = bgColor),
+                        border = androidx.compose.foundation.BorderStroke(if (isError || isMatched || isSelected) 2.dp else 0.dp, borderColor)
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize().padding(12.dp)) {
+                            Text(text, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = if (isMatched || isSelected) FireOrangeDeep else MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.Center)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+// ─── Beautiful FlipCard ───────────────────────────────────────────────────────
 
 @Composable
 private fun FlipCard(
-    word: String,
-    translation: String,
+    item: SessionWordItem,
     isRevealed: Boolean,
+    blurContent: Boolean,
+    audioOnlyFront: Boolean,
+    showNativeFirst: Boolean,
     onClick: () -> Unit
 ) {
+    val context = LocalContext.current
+
     val rotation by animateFloatAsState(
         targetValue = if (isRevealed) 180f else 0f,
-        animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
         label = "cardFlip"
     )
-
     val isFrontVisible = rotation <= 90f
+
+    val wordTextModifier = if (blurContent) Modifier.blur(16.dp) else Modifier
 
     ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(0.72f)
+            .height(280.dp)
             .graphicsLayer {
                 rotationY       = rotation
-                cameraDistance  = 12f * density
+                cameraDistance  = 16f * density
             }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -355,87 +806,149 @@ private fun FlipCard(
                 onClick           = onClick
             ),
         shape     = RoundedCornerShape(32.dp),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 8.dp),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 12.dp),
         colors    = CardDefaults.elevatedCardColors(
-            containerColor = if (isFrontVisible)
-                MaterialTheme.colorScheme.surface
-            else
-                FireContainer
+            containerColor = if (isFrontVisible) MaterialTheme.colorScheme.surface else FireOrangeDeep
         )
     ) {
-        Box(
-            modifier          = Modifier.fillMaxSize(),
-            contentAlignment  = Alignment.Center
-        ) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             if (isFrontVisible) {
-                // ── Front side ──
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier            = Modifier.padding(32.dp)
-                ) {
-                    Text(
-                        text       = word,
-                        style      = MaterialTheme.typography.displaySmall,
-                        fontWeight = FontWeight.Black,
-                        color      = MaterialTheme.colorScheme.onSurface,
-                        textAlign  = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Surface(
-                        shape = CircleShape,
-                        color = FireOrange.copy(alpha = 0.1f)
+                // FRONT
+                if (audioOnlyFront) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(24.dp).fillMaxSize(),
+                        verticalArrangement = Arrangement.Center
                     ) {
-                        IconButton(onClick = {}) {
-                            Icon(
-                                Icons.Outlined.VolumeUp,
-                                contentDescription = "Pronounce",
-                                tint               = FireOrange
-                            )
+                        Surface(shape = CircleShape, color = FireOrange.copy(alpha = 0.15f), modifier = Modifier.size(80.dp).clickable { playTestSound(context) }) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Rounded.VolumeUp, "Listen", tint = FireOrange, modifier = Modifier.size(40.dp))
+                            }
                         }
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text  = "Tap to reveal",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                } else {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(24.dp).fillMaxSize(),
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        
+                        // Top badges (Article + Word Type)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            if (!item.wordType.isNullOrBlank() && !showNativeFirst) {
+                                BadgeLayout(item.wordType.uppercase(), MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
+                            } else {
+                                Spacer(Modifier.width(8.dp))
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.weight(1f))
+                        
+                        // Main Word Content
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (!item.article.isNullOrBlank() && !blurContent && !showNativeFirst) {
+                                Text(
+                                    text = "${item.article} ",
+                                    style = MaterialTheme.typography.displaySmall,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                )
+                            }
+                            Text(
+                                text = if (showNativeFirst) item.translation else item.word,
+                                style = MaterialTheme.typography.displaySmall,
+                                fontWeight = FontWeight.Black,
+                                textAlign = TextAlign.Center,
+                                modifier = wordTextModifier
+                            )
+                        }
+
+                        if (!item.plural.isNullOrBlank() && !blurContent && !showNativeFirst) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "pl. ${item.plural}",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontStyle = FontStyle.Italic,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        
+                        if (!item.exampleSentence.isNullOrBlank() && !blurContent && !showNativeFirst) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "\"${item.exampleSentence}\"",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontStyle = FontStyle.Italic,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.weight(1f))
+
+                        if (!showNativeFirst) {
+                            // Audio Button
+                            Surface(shape = CircleShape, color = FireOrange.copy(alpha = 0.1f)) {
+                                IconButton(onClick = { playTestSound(context) }) { Icon(Icons.Rounded.VolumeUp, "Pronounce", tint = FireOrange) }
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.height(48.dp))
+                        }
+                    }
                 }
             } else {
-                // ── Back side (mirrored to read correctly) ──
+                // BACK (Revealed)
+                val backWord = if (audioOnlyFront) item.word else if (showNativeFirst) item.word else item.translation
+                val backSubWord = if (audioOnlyFront) null else if (showNativeFirst) item.translation else item.word
+                
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier            = Modifier
-                        .padding(32.dp)
-                        .graphicsLayer { rotationY = 180f }
+                    modifier = Modifier.padding(24.dp).fillMaxSize().graphicsLayer { rotationY = 180f },
+                    verticalArrangement = Arrangement.Center
                 ) {
+                    Text(if (audioOnlyFront) "Word" else "Translation", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.6f), letterSpacing = 2.sp)
+                    Spacer(modifier = Modifier.height(24.dp))
                     Text(
-                        text       = "Translation",
-                        style      = MaterialTheme.typography.labelMedium,
-                        color      = OnFireContainer.copy(alpha = 0.6f),
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text       = translation,
-                        style      = MaterialTheme.typography.displaySmall,
+                        text = backWord.ifBlank { "—" },
+                        style = MaterialTheme.typography.displaySmall,
                         fontWeight = FontWeight.Black,
-                        color      = OnFireContainer,
-                        textAlign  = TextAlign.Center
+                        color = Color.White,
+                        textAlign = TextAlign.Center
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Original word reminder
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = OnFireContainer.copy(alpha = 0.1f)
-                    ) {
-                        Text(
-                            text      = word,
-                            style     = MaterialTheme.typography.bodyMedium,
-                            color     = OnFireContainer,
-                            modifier  = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            textAlign = TextAlign.Center
-                        )
+                    
+                    if (backSubWord != null) {
+                        Spacer(modifier = Modifier.height(32.dp))
+                        Surface(shape = RoundedCornerShape(16.dp), color = Color.White.copy(alpha = 0.15f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
+                                if (!item.article.isNullOrBlank() && showNativeFirst) {
+                                    Text(
+                                        text = "${item.article} ",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Normal,
+                                        color = Color.White.copy(alpha = 0.7f)
+                                    )
+                                }
+                                Text(
+                                    text = backSubWord,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    } else if (audioOnlyFront) {
+                        Spacer(modifier = Modifier.height(32.dp))
+                        if (!item.translation.isNullOrBlank()) {
+                            Text(
+                                text = item.translation,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontStyle = FontStyle.Italic,
+                                color = Color.White.copy(alpha = 0.8f)
+                            )
+                        }
                     }
                 }
             }
@@ -443,41 +956,39 @@ private fun FlipCard(
     }
 }
 
-// ─── Answer button ───────────────────────────────────────────────────────────
-
 @Composable
-private fun AnswerButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    color: Color,
-    onClick: () -> Unit
-) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        FilledIconButton(
-            onClick  = onClick,
-            modifier = Modifier.size(72.dp),
-            colors   = IconButtonDefaults.filledIconButtonColors(
-                containerColor = color.copy(alpha = 0.12f)
-            )
-        ) {
-            Icon(
-                icon,
-                contentDescription = label,
-                tint               = color,
-                modifier           = Modifier.size(32.dp)
-            )
+private fun BadgeLayout(text: String, containerColor: Color, contentColor: Color) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = containerColor,
+        modifier = Modifier.height(26.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 10.dp)) {
+            Text(text, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = contentColor)
         }
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text       = label,
-            style      = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color      = color
-        )
     }
 }
 
-// ─── Finished ────────────────────────────────────────────────────────────────
+@Composable
+private fun SrsButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, color: Color, surfaceColor: Color, onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Surface(
+            shape = CircleShape,
+            color = surfaceColor,
+            modifier = Modifier
+                .size(72.dp)
+                .clickable { onClick() }
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(icon, label, tint = color, modifier = Modifier.size(36.dp))
+            }
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = color)
+    }
+}
+
+// ─── Finish Screen ────────────────────────────────────────────────────────────
 
 @Composable
 private fun SessionFinishedScreen(
@@ -505,40 +1016,47 @@ private fun SessionFinishedScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier            = Modifier.padding(32.dp)
         ) {
-            Text(emoji, fontSize = 80.sp)
-            Spacer(modifier = Modifier.height(16.dp))
+            Text(emoji, fontSize = 100.sp)
+            Spacer(modifier = Modifier.height(24.dp))
             Text(
                 "Session Complete!",
                 style      = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Black,
                 color      = Color.White
             )
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(48.dp))
 
-            // Stats row
-            Row(
-                modifier              = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = Color.White.copy(alpha = 0.15f),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                FinishStat(label = "Correct",  value = "$correctCount", color = Color(0xFF81C784))
-                FinishStat(label = "Forgot",   value = "$forgotCount",  color = Color(0xFFEF9A9A))
-                FinishStat(label = "Accuracy", value = "$accuracy%",    color = Color.White)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    FinishStat(label = "Correct",  value = "$correctCount", color = Color(0xFFC8E6C9))
+                    FinishStat(label = "Forgot",   value = "$forgotCount",  color = Color(0xFFFFCDD2))
+                    FinishStat(label = "Accuracy", value = "$accuracy%",    color = Color.White)
+                }
             }
 
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(64.dp))
             Button(
                 onClick = onRestart,
                 colors  = ButtonDefaults.buttonColors(containerColor = Color.White),
                 shape   = CircleShape,
                 modifier = Modifier
-                    .height(60.dp)
-                    .fillMaxWidth(0.7f)
+                    .height(64.dp)
+                    .fillMaxWidth(0.85f)
+                    .shadow(16.dp, CircleShape, spotColor = Color.White.copy(alpha = 0.5f))
             ) {
                 Text(
-                    "NEW SESSION",
+                    "FINISH",
                     color      = FireOrangeDeep,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize   = 16.sp
+                    fontWeight = FontWeight.Black,
+                    fontSize   = 18.sp,
+                    letterSpacing = 1.sp
                 )
             }
         }
@@ -548,16 +1066,18 @@ private fun SessionFinishedScreen(
 @Composable
 private fun FinishStat(label: String, value: String, color: Color) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text       = value,
-            style      = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Black,
-            color      = color
-        )
-        Text(
-            text  = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = Color.White.copy(alpha = 0.75f)
-        )
+        Text(value, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Black, color = color)
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(label, style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.8f))
+    }
+}
+
+fun playTestSound(context: android.content.Context) {
+    try {
+        val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        val r = RingtoneManager.getRingtone(context, uri)
+        r.play()
+    } catch (e: Exception) {
+        // Ignored
     }
 }

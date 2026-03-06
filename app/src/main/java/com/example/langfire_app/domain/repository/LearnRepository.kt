@@ -19,4 +19,10 @@ interface LearnRepository {
      * Records the user's answer quality for [wordId] and updates SM-2 state in the DB.
      */
     suspend fun recordAnswer(profileId: Int, wordId: Int, quality: SrsEngine.Quality)
+
+    /**
+     * Returns a list of random words (other than [excludedWordId]) to act as wrong answers
+     * or for matching exercises.
+     */
+    suspend fun getDistractors(profileId: Int, courseId: Int, excludedWordId: Int, limit: Int = 3): List<SessionWordItem>
 }

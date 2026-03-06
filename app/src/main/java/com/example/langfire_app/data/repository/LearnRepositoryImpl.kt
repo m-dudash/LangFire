@@ -64,4 +64,13 @@ class LearnRepositoryImpl @Inject constructor(
             wordProgressDao.update(updated)
         }
     }
+
+    override suspend fun getDistractors(
+        profileId: Int,
+        courseId: Int,
+        excludedWordId: Int,
+        limit: Int
+    ): List<SessionWordItem> {
+        return wordProgressDao.getRandomWords(profileId, courseId, excludedWordId, limit)
+    }
 }

@@ -23,6 +23,10 @@ data class SessionWordItem(
     val wordId: Int,
     val word: String,
     val translation: String,
+    val article: String?,
+    val plural: String?,
+    val wordType: String?,
+    val exampleSentence: String?,
     val knowledgeCoeff: Float?,
     val nextReviewAt: Long?,
     val srsInterval: Int?,
@@ -272,6 +276,10 @@ interface WordProgressDao {
             w.id                AS wordId,
             w.word              AS word,
             COALESCE(wt.word, '') AS translation,
+            a.name              AS article,
+            w.plural            AS plural,
+            wType.type          AS wordType,
+            tr.example_sentence AS exampleSentence,
             wp.knowledge_coeff  AS knowledgeCoeff,
             wp.next_review_at   AS nextReviewAt,
             wp.srs_interval     AS srsInterval,
@@ -286,6 +294,8 @@ interface WordProgressDao {
         LEFT JOIN words wt
             ON (wt.id = tr.words_id_primary OR wt.id = tr.words_id_secondary)
             AND wt.id != w.id
+        LEFT JOIN article a ON a.id = w.article_id
+        LEFT JOIN word_type wType ON wType.id = w.word_type_id
         LEFT JOIN word_progress wp
             ON wp.word_id = w.id AND wp.profile_id = :profileId
         WHERE u.course_id = :courseId
@@ -307,5 +317,44 @@ interface WordProgressDao {
         courseId: Int,
         nowMs: Long,
         limit: Int = 20
+    ): List<SessionWordItem>
+
+    @Query("""
+        SELECT
+            w.id                AS wordId,
+            w.word              AS word,
+            COALESCE(wt.word, '') AS translation,
+            a.name              AS article,
+            w.plural            AS plural,
+            wType.type          AS wordType,
+            tr.example_sentence AS exampleSentence,
+            wp.knowledge_coeff  AS knowledgeCoeff,
+            wp.next_review_at   AS nextReviewAt,
+            wp.srs_interval     AS srsInterval,
+            wp.srs_ease_factor  AS srsEaseFactor,
+            wp.srs_repetition   AS srsRepetition,
+            wp.correct_count    AS correctCount,
+            wp.incorrect_count  AS incorrectCount
+        FROM words w
+        JOIN unit u ON u.id = w.unit_id
+        LEFT JOIN translation tr
+            ON (tr.words_id_primary = w.id OR tr.words_id_secondary = w.id)
+        LEFT JOIN words wt
+            ON (wt.id = tr.words_id_primary OR wt.id = tr.words_id_secondary)
+            AND wt.id != w.id
+        LEFT JOIN article a ON a.id = w.article_id
+        LEFT JOIN word_type wType ON wType.id = w.word_type_id
+        LEFT JOIN word_progress wp
+            ON wp.word_id = w.id AND wp.profile_id = :profileId
+        WHERE u.course_id = :courseId
+          AND w.id != :excludedWordId
+        ORDER BY RANDOM()
+        LIMIT :limit
+    """)
+    suspend fun getRandomWords(
+        profileId: Int,
+        courseId: Int,
+        excludedWordId: Int,
+        limit: Int
     ): List<SessionWordItem>
 }
