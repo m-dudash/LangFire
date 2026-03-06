@@ -30,8 +30,9 @@ object DatabaseModule {
             AppDatabase::class.java,
             "langfire_db"
         )
-            .fallbackToDestructiveMigration()
-            .addCallback(callback)
+            .createFromAsset("databases/app_database.db")
+//            .fallbackToDestructiveMigration()
+//            .addCallback(callback)
             .build()
     }
 

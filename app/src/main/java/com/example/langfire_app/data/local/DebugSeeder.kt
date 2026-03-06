@@ -41,6 +41,7 @@ class DebugSeeder @Inject constructor(
         val courses = seedCourses(db)
         val unitsByCourse = seedUnits(db, courses)
         val wordIds = seedWords(db, courses, unitsByCourse)
+        seedTranslations(db, wordIds)
 
         val profileIds = seedProfiles()
         val activeProfileId = profileIds.first()
@@ -175,6 +176,25 @@ class DebugSeeder @Inject constructor(
         }
 
         return wordIds
+    }
+
+    private fun seedTranslations(db: SupportSQLiteDatabase, wordIds: List<Int>) {
+        if (wordIds.size < 2 * WORDS_PER_COURSE) return
+
+        var nextTranslationId = 1
+        for (i in 0 until WORDS_PER_COURSE) {
+            val dutchWordId = wordIds[i]
+            val slovakWordId = wordIds[i + WORDS_PER_COURSE]
+
+            insert(
+                db,
+                "INSERT OR REPLACE INTO translation (id, words_id_primary, words_id_secondary, example_sentence) VALUES (?, ?, ?, ?)",
+                nextTranslationId++,
+                dutchWordId,
+                slovakWordId,
+                null
+            )
+        }
     }
 
     private suspend fun seedProfiles(): List<Int> {
@@ -317,7 +337,7 @@ class DebugSeeder @Inject constructor(
         return min + random.nextFloat() * (max - min)
     }
 
-    private fun insert(db: SupportSQLiteDatabase, sql: String, vararg args: Any) {
+    private fun insert(db: SupportSQLiteDatabase, sql: String, vararg args: Any?) {
         db.execSQL(sql, args)
     }
 
@@ -339,7 +359,7 @@ class DebugSeeder @Inject constructor(
 
     private companion object {
         const val DEBUG_SEED_KEY = "debug_seed_v1"
-        const val DEBUG_SEED_VERSION = "1"
+        const val DEBUG_SEED_VERSION = "2"
         const val WORDS_PER_COURSE = 60
         const val WORDS_PER_UNIT = 10
         const val WORDS_PER_LEVEL = 10
