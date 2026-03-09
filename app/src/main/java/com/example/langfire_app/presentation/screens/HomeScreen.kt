@@ -1124,9 +1124,6 @@ private fun StatWordRow(
     item: StatWordItem,
     accentColor: Color
 ) {
-    val coeff = item.knowledgeCoeff
-    val progressPercent = if (coeff != null) (coeff * 100).toInt() else null
-
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -1176,17 +1173,6 @@ private fun StatWordRow(
                         color = accentColor,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                         maxLines = 1
-                    )
-                }
-            }
-
-            // Progress % (if available)
-            if (progressPercent != null) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "$progressPercent%",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                        color = accentColor
                     )
                 }
             }

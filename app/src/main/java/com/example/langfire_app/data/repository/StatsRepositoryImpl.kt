@@ -67,13 +67,11 @@ class StatsRepositoryImpl @Inject constructor(
         val toLearn = wordProgressDao.countToLearnByCourse(profileId, courseId)
         val practiced = wordProgressDao.countPracticedByCourse(
             profileId = profileId,
-            courseId = courseId,
-            threshold = 0.30f
+            courseId = courseId
         )
         val learned = wordProgressDao.countLearnedByCourse(
             profileId = profileId,
-            courseId = courseId,
-            threshold = 0.85f
+            courseId = courseId
         )
 
         return HomeCourseStats(
@@ -87,8 +85,8 @@ class StatsRepositoryImpl @Inject constructor(
         wordProgressDao.getToLearnWordsByCourse(profileId, courseId)
 
     override suspend fun getPracticedWords(profileId: Int, courseId: Int): List<StatWordItem> =
-        wordProgressDao.getPracticedWordsByCourse(profileId, courseId, practicedThreshold = 0.19f)
+        wordProgressDao.getPracticedWordsByCourse(profileId, courseId)
 
     override suspend fun getLearnedWords(profileId: Int, courseId: Int): List<StatWordItem> =
-        wordProgressDao.getLearnedWordsByCourse(profileId, courseId, learnedThreshold = 0.85f)
+        wordProgressDao.getLearnedWordsByCourse(profileId, courseId)
 }

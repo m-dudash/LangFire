@@ -12,7 +12,8 @@ data class StatWordItem(
     val word: String,
     val translation: String,
     val unitName: String,
-    val knowledgeCoeff: Float?
+    val knowledgeCoeff: Float?,
+    @ColumnInfo(name = "srs_repetition") val srsRepetition: Int?
 )
 
 /**
@@ -138,6 +139,7 @@ interface WordProgressDao {
     JOIN course c ON u.course_id = c.id
     WHERE wp.profile_id = :profileId
       AND u.course_id = :courseId
+      AND (wp.srs_repetition IS NULL OR wp.srs_repetition = 0)
       AND w.language_id = c.target_language_id
 """)
     suspend fun countToLearnByCourse(
@@ -153,13 +155,15 @@ interface WordProgressDao {
     JOIN course c ON u.course_id = c.id
     WHERE wp.profile_id = :profileId
       AND u.course_id = :courseId
-      AND COALESCE(wp.knowledge_coeff, 0) > :threshold
+      AND wp.srs_repetition >= :minRepetitionThreshold
+      AND wp.srs_repetition < :maxRepetitionThreshold
       AND w.language_id = c.target_language_id
 """)
     suspend fun countPracticedByCourse(
         profileId: Int,
         courseId: Int,
-        threshold: Float = 0.30f
+        minRepetitionThreshold: Int = 1,
+        maxRepetitionThreshold: Int = 5
     ): Int
 
     @Query("""
@@ -170,13 +174,13 @@ interface WordProgressDao {
     JOIN course c ON u.course_id = c.id
     WHERE wp.profile_id = :profileId
       AND u.course_id = :courseId
-      AND COALESCE(wp.knowledge_coeff, 0) >= :threshold
+      AND wp.srs_repetition >= :repetitionThreshold
       AND w.language_id = c.target_language_id
 """)
     suspend fun countLearnedByCourse(
         profileId: Int,
         courseId: Int,
-        threshold: Float = 0.85f
+        repetitionThreshold: Int = 5
     ): Int
 
     // ─── Stats Bottom Sheet Queries ───────────────────────────────────────────
@@ -191,7 +195,8 @@ interface WordProgressDao {
             w.word          AS word,
             COALESCE(wt.word, 'No translation') AS translation,
             u.name          AS unitName,
-            wp.knowledge_coeff AS knowledgeCoeff
+            wp.knowledge_coeff AS knowledgeCoeff,
+            wp.srs_repetition  AS srs_repetition
         FROM word_progress wp
         JOIN words w ON w.id = wp.word_id
         JOIN unit u ON u.id = w.unit_id
@@ -204,6 +209,7 @@ interface WordProgressDao {
         WHERE wp.profile_id = :profileId
           AND u.course_id   = :courseId
           AND w.language_id = c.target_language_id
+          AND (wp.srs_repetition IS NULL OR wp.srs_repetition = 0)
         ORDER BY u.name ASC, w.word ASC
     """)
     suspend fun getToLearnWordsByCourse(
@@ -220,7 +226,8 @@ interface WordProgressDao {
             w.word          AS word,
             COALESCE(wt.word, 'No translation') AS translation,
             u.name          AS unitName,
-            wp.knowledge_coeff AS knowledgeCoeff
+            wp.knowledge_coeff AS knowledgeCoeff,
+            wp.srs_repetition  AS srs_repetition
         FROM word_progress wp
         JOIN words w ON w.id = wp.word_id
         JOIN unit u ON u.id = w.unit_id
@@ -233,13 +240,15 @@ interface WordProgressDao {
         WHERE wp.profile_id = :profileId
           AND u.course_id   = :courseId
           AND w.language_id = c.target_language_id
-          AND COALESCE(wp.knowledge_coeff, 0) > :practicedThreshold
-        ORDER BY u.name ASC, wp.knowledge_coeff DESC
+          AND wp.srs_repetition >= :minRepetitionThreshold
+          AND wp.srs_repetition < :maxRepetitionThreshold
+        ORDER BY u.name ASC, wp.srs_repetition DESC
     """)
     suspend fun getPracticedWordsByCourse(
         profileId: Int,
         courseId: Int,
-        practicedThreshold: Float = 0.19f
+        minRepetitionThreshold: Int = 1,
+        maxRepetitionThreshold: Int = 5
     ): List<StatWordItem>
 
     /**
@@ -251,7 +260,8 @@ interface WordProgressDao {
             w.word          AS word,
             COALESCE(wt.word, 'No translation') AS translation,
             u.name          AS unitName,
-            wp.knowledge_coeff AS knowledgeCoeff
+            wp.knowledge_coeff AS knowledgeCoeff,
+            wp.srs_repetition  AS srs_repetition
         FROM word_progress wp
         JOIN words w ON w.id = wp.word_id
         JOIN unit u ON u.id = w.unit_id
@@ -264,13 +274,13 @@ interface WordProgressDao {
         WHERE wp.profile_id = :profileId
           AND u.course_id   = :courseId
           AND w.language_id = c.target_language_id
-          AND COALESCE(wp.knowledge_coeff, 0) >= :learnedThreshold
-        ORDER BY u.name ASC, wp.knowledge_coeff DESC
+          AND wp.srs_repetition >= :repetitionThreshold
+        ORDER BY u.name ASC, wp.srs_repetition DESC
     """)
     suspend fun getLearnedWordsByCourse(
         profileId: Int,
         courseId: Int,
-        learnedThreshold: Float = 0.85f
+        repetitionThreshold: Int = 5
     ): List<StatWordItem>
 
     // ─── SRS Session Query ────────────────────────────────────────────────────
