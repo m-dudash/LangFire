@@ -38,11 +38,13 @@ class DatabaseCallback @Inject constructor(
         val dutchCourse = com.example.langfire_app.data.local.entities.CourseEntity(
             name = "Dutch (from English)",
             targetLang = "nl",
+            targetLanguageId = 1,
             icon = "🇳🇱"
         )
         val slovakCourse = com.example.langfire_app.data.local.entities.CourseEntity(
             name = "Slovak (from Russian)",
             targetLang = "sk",
+            targetLanguageId = 2,
             icon = "🇸🇰"
         )
         courseDao.insert(dutchCourse)

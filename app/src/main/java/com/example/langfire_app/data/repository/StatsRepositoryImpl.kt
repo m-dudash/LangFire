@@ -87,7 +87,7 @@ class StatsRepositoryImpl @Inject constructor(
         wordProgressDao.getToLearnWordsByCourse(profileId, courseId)
 
     override suspend fun getPracticedWords(profileId: Int, courseId: Int): List<StatWordItem> =
-        wordProgressDao.getPracticedWordsByCourse(profileId, courseId, practicedThreshold = 0.30f)
+        wordProgressDao.getPracticedWordsByCourse(profileId, courseId, practicedThreshold = 0.19f)
 
     override suspend fun getLearnedWords(profileId: Int, courseId: Int): List<StatWordItem> =
         wordProgressDao.getLearnedWordsByCourse(profileId, courseId, learnedThreshold = 0.85f)

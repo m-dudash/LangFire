@@ -17,7 +17,8 @@ interface UnitDao {
             COUNT(CASE WHEN wp.knowledge_coeff >= :learnedThreshold THEN 1 END) AS learnedWords
         FROM unit u
         JOIN level l ON u.level_id = l.id
-        LEFT JOIN words w ON w.unit_id = u.id
+        JOIN course c ON u.course_id = c.id
+        LEFT JOIN words w ON w.unit_id = u.id AND w.language_id = c.target_language_id
         LEFT JOIN word_progress wp ON wp.word_id = w.id AND wp.profile_id = :profileId
         WHERE u.course_id = :courseId
         GROUP BY u.id, l.id

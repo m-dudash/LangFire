@@ -4,6 +4,7 @@ data class Course(
     val id: Int = 0,
     val name: String,
     val targetLang: String,
+    val targetLanguageId: Int = 1,
     val icon: String
 )
 

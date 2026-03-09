@@ -21,10 +21,13 @@ interface WordsDao {
             COALESCE(wt.word, 'No translation') AS translation,
             wp.knowledge_coeff AS knowledgeCoeff
         FROM words w
+        JOIN unit u ON w.unit_id = u.id
+        JOIN course c ON u.course_id = c.id
         LEFT JOIN translation t ON (t.words_id_primary = w.id OR t.words_id_secondary = w.id)
         LEFT JOIN words wt ON (wt.id = t.words_id_primary OR wt.id = t.words_id_secondary) AND wt.id != w.id
         LEFT JOIN word_progress wp ON wp.word_id = w.id AND wp.profile_id = :profileId
         WHERE w.unit_id = :unitId
+          AND w.language_id = c.target_language_id
         GROUP BY w.id
         ORDER BY w.id ASC
     """)

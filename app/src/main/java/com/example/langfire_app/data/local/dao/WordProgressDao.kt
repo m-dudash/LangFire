@@ -107,15 +107,18 @@ interface WordProgressDao {
             l.name                                                        AS levelName,
             COUNT(DISTINCT CASE
                 WHEN u.course_id = :courseId
+                 AND w.language_id = c.target_language_id
                 THEN w.id END)                                            AS totalWords,
             COUNT(DISTINCT CASE
                 WHEN u.course_id = :courseId
+                 AND w.language_id = c.target_language_id
                  AND wp.profile_id = :profileId
                  AND wp.knowledge_coeff >= :threshold
                 THEN w.id END)                                            AS learnedWords
         FROM level l
         LEFT JOIN words  w  ON w.level_id  = l.id
         LEFT JOIN unit   u  ON u.id = w.unit_id
+        LEFT JOIN course c  ON u.course_id = c.id
         LEFT JOIN word_progress wp ON wp.word_id = w.id
         GROUP BY l.id, l.name
         ORDER BY l.id ASC
@@ -132,8 +135,10 @@ interface WordProgressDao {
     FROM word_progress wp
     JOIN words w ON w.id = wp.word_id
     JOIN unit u ON u.id = w.unit_id
+    JOIN course c ON u.course_id = c.id
     WHERE wp.profile_id = :profileId
       AND u.course_id = :courseId
+      AND w.language_id = c.target_language_id
 """)
     suspend fun countToLearnByCourse(
         profileId: Int,
@@ -145,9 +150,11 @@ interface WordProgressDao {
     FROM word_progress wp
     JOIN words w ON w.id = wp.word_id
     JOIN unit u ON u.id = w.unit_id
+    JOIN course c ON u.course_id = c.id
     WHERE wp.profile_id = :profileId
       AND u.course_id = :courseId
       AND COALESCE(wp.knowledge_coeff, 0) > :threshold
+      AND w.language_id = c.target_language_id
 """)
     suspend fun countPracticedByCourse(
         profileId: Int,
@@ -160,9 +167,11 @@ interface WordProgressDao {
     FROM word_progress wp
     JOIN words w ON w.id = wp.word_id
     JOIN unit u ON u.id = w.unit_id
+    JOIN course c ON u.course_id = c.id
     WHERE wp.profile_id = :profileId
       AND u.course_id = :courseId
       AND COALESCE(wp.knowledge_coeff, 0) >= :threshold
+      AND w.language_id = c.target_language_id
 """)
     suspend fun countLearnedByCourse(
         profileId: Int,
@@ -186,6 +195,7 @@ interface WordProgressDao {
         FROM word_progress wp
         JOIN words w ON w.id = wp.word_id
         JOIN unit u ON u.id = w.unit_id
+        JOIN course c ON u.course_id = c.id
         LEFT JOIN translation tr
             ON (tr.words_id_primary = w.id OR tr.words_id_secondary = w.id)
         LEFT JOIN words wt
@@ -193,6 +203,7 @@ interface WordProgressDao {
             AND wt.id != w.id
         WHERE wp.profile_id = :profileId
           AND u.course_id   = :courseId
+          AND w.language_id = c.target_language_id
         ORDER BY u.name ASC, w.word ASC
     """)
     suspend fun getToLearnWordsByCourse(
@@ -213,6 +224,7 @@ interface WordProgressDao {
         FROM word_progress wp
         JOIN words w ON w.id = wp.word_id
         JOIN unit u ON u.id = w.unit_id
+        JOIN course c ON u.course_id = c.id
         LEFT JOIN translation tr
             ON (tr.words_id_primary = w.id OR tr.words_id_secondary = w.id)
         LEFT JOIN words wt
@@ -220,13 +232,14 @@ interface WordProgressDao {
             AND wt.id != w.id
         WHERE wp.profile_id = :profileId
           AND u.course_id   = :courseId
+          AND w.language_id = c.target_language_id
           AND COALESCE(wp.knowledge_coeff, 0) > :practicedThreshold
         ORDER BY u.name ASC, wp.knowledge_coeff DESC
     """)
     suspend fun getPracticedWordsByCourse(
         profileId: Int,
         courseId: Int,
-        practicedThreshold: Float = 0.30f
+        practicedThreshold: Float = 0.19f
     ): List<StatWordItem>
 
     /**
@@ -242,6 +255,7 @@ interface WordProgressDao {
         FROM word_progress wp
         JOIN words w ON w.id = wp.word_id
         JOIN unit u ON u.id = w.unit_id
+        JOIN course c ON u.course_id = c.id
         LEFT JOIN translation tr
             ON (tr.words_id_primary = w.id OR tr.words_id_secondary = w.id)
         LEFT JOIN words wt
@@ -249,6 +263,7 @@ interface WordProgressDao {
             AND wt.id != w.id
         WHERE wp.profile_id = :profileId
           AND u.course_id   = :courseId
+          AND w.language_id = c.target_language_id
           AND COALESCE(wp.knowledge_coeff, 0) >= :learnedThreshold
         ORDER BY u.name ASC, wp.knowledge_coeff DESC
     """)
@@ -289,6 +304,7 @@ interface WordProgressDao {
             wp.incorrect_count  AS incorrectCount
         FROM words w
         JOIN unit u ON u.id = w.unit_id
+        JOIN course c ON u.course_id = c.id
         LEFT JOIN translation tr
             ON (tr.words_id_primary = w.id OR tr.words_id_secondary = w.id)
         LEFT JOIN words wt
@@ -299,6 +315,7 @@ interface WordProgressDao {
         LEFT JOIN word_progress wp
             ON wp.word_id = w.id AND wp.profile_id = :profileId
         WHERE u.course_id = :courseId
+          AND w.language_id = c.target_language_id
           AND (
                 -- New word: profile has it marked for learning (coeff = 0.0) or there's a progress record that is due
                 (wp.knowledge_coeff IS NOT NULL AND wp.knowledge_coeff < 0.95 AND (wp.next_review_at IS NULL OR wp.next_review_at <= :nowMs))
@@ -337,6 +354,7 @@ interface WordProgressDao {
             wp.incorrect_count  AS incorrectCount
         FROM words w
         JOIN unit u ON u.id = w.unit_id
+        JOIN course c ON u.course_id = c.id
         LEFT JOIN translation tr
             ON (tr.words_id_primary = w.id OR tr.words_id_secondary = w.id)
         LEFT JOIN words wt
@@ -347,6 +365,7 @@ interface WordProgressDao {
         LEFT JOIN word_progress wp
             ON wp.word_id = w.id AND wp.profile_id = :profileId
         WHERE u.course_id = :courseId
+          AND w.language_id = c.target_language_id
           AND w.id != :excludedWordId
         ORDER BY RANDOM()
         LIMIT :limit

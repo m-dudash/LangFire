@@ -94,10 +94,11 @@ class DebugSeeder @Inject constructor(
         courses.forEach { course ->
             insert(
                 db,
-                "INSERT OR REPLACE INTO course (id, name, target_lang, icon) VALUES (?, ?, ?, ?)",
+                "INSERT OR REPLACE INTO course (id, name, target_lang, target_language_id, icon) VALUES (?, ?, ?, ?, ?)",
                 course.id,
                 course.name,
                 course.targetLang,
+                course.languageId,
                 course.icon
             )
         }

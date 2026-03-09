@@ -157,6 +157,7 @@ object EntityMappers {
         id = id,
         name = name,
         targetLang = targetLang,
+        targetLanguageId = targetLanguageId,
         icon = icon ?: "🏳️"
     )
 
@@ -164,6 +165,7 @@ object EntityMappers {
         id = id,
         name = name,
         targetLang = targetLang,
+        targetLanguageId = targetLanguageId,
         icon = icon
     )
 }
