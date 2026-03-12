@@ -3,6 +3,9 @@ package com.example.langfire_app.presentation.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.langfire_app.data.local.dao.SessionWordItem
+import com.example.langfire_app.domain.engine.GamificationEngine
+import com.example.langfire_app.domain.model.EngineResult
+import com.example.langfire_app.domain.model.SessionBehaviorBuilder
 import com.example.langfire_app.domain.srs.SrsEngine
 import com.example.langfire_app.domain.repository.LearnRepository
 import com.example.langfire_app.domain.repository.ProfileRepository
@@ -57,7 +60,10 @@ data class LearnUiState(
     // summary counters
     val totalInSession: Int = 0,
     val correctCount: Int = 0,
-    val forgotCount: Int = 0
+    val forgotCount: Int = 0,
+
+    // gamification result (populated when session finishes)
+    val engineResult: EngineResult? = null
 ) {
     val currentExercise: ExerciseItem? get() = queue.getOrNull(currentIndex)
     val progress: Float get() = if (totalInSession == 0) 0f else (currentIndex + 1).toFloat() / totalInSession
@@ -69,15 +75,20 @@ data class LearnUiState(
 class LearnViewModel @Inject constructor(
     private val learnRepository: LearnRepository,
     private val profileRepository: ProfileRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val gamificationEngine: GamificationEngine
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LearnUiState())
     val uiState = _uiState.asStateFlow()
 
+    /** Timestamp when the user started the current session (used for session_time). */
+    private var sessionStartedAt: Long = 0L
+
     init { loadSession() }
 
     fun startSession() {
+        sessionStartedAt = System.currentTimeMillis()
         _uiState.update { it.copy(sessionPhase = SessionPhase.STUDYING, cardPhase = CardPhase.FRONT) }
     }
 
@@ -150,6 +161,24 @@ class LearnViewModel @Inject constructor(
             val nextIndex = state.currentIndex + 1
             val isFinished = nextIndex >= state.queue.size
 
+            // Calculate final counts BEFORE updating state
+            val finalCorrect = state.correctCount + if (wasCorrect) 1 else 0
+            val finalForgot  = state.forgotCount  + if (!wasCorrect) 1 else 0
+
+            // If session is finished, process gamification
+            var engineResult: EngineResult? = null
+            if (isFinished) {
+                val elapsedSec = (System.currentTimeMillis() - sessionStartedAt) / 1000
+                val behavior = SessionBehaviorBuilder.build(
+                    profileId          = profile.id,
+                    correctCount       = finalCorrect,
+                    forgotCount        = finalForgot,
+                    totalExercises     = state.totalInSession,
+                    sessionDurationSec = elapsedSec
+                )
+                engineResult = gamificationEngine.processBehavior(behavior)
+            }
+
             _uiState.update {
                 it.copy(
                     currentIndex = nextIndex,
@@ -157,9 +186,10 @@ class LearnViewModel @Inject constructor(
                     typedText = "",
                     isTypeCorrect = null,
                     selectedWordId = null,
-                    correctCount = it.correctCount + if (wasCorrect) 1 else 0,
-                    forgotCount = it.forgotCount + if (!wasCorrect) 1 else 0,
-                    sessionPhase = if (isFinished) SessionPhase.FINISHED else SessionPhase.STUDYING
+                    correctCount = finalCorrect,
+                    forgotCount = finalForgot,
+                    sessionPhase = if (isFinished) SessionPhase.FINISHED else SessionPhase.STUDYING,
+                    engineResult = engineResult
                 )
             }
         }
@@ -248,7 +278,8 @@ class LearnViewModel @Inject constructor(
                     cardPhase      = CardPhase.FRONT,
                     totalInSession = exercises.size,
                     correctCount   = 0,
-                    forgotCount    = 0
+                    forgotCount    = 0,
+                    engineResult   = null
                 )
             }
         }

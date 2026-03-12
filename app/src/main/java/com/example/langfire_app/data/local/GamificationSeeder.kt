@@ -17,9 +17,10 @@ import javax.inject.Singleton
  * - Accuracy achievements
  * - Speed achievements
  * - Rare wheel-of-fortune achievements
+ * - Session-based XP rewards
  *
- * All rules correspond to the gamification elements described in the thesis:
- * Body (points), Achievementy, Denná séria (daily streak), etc.
+ * XP values are stored in [Rule.xpReward] — the engine reads them from the
+ * database at evaluation time rather than using hardcoded constants.
  */
 @Singleton
 class GamificationSeeder @Inject constructor(
@@ -153,7 +154,7 @@ class GamificationSeeder @Inject constructor(
                 type = "streak",
                 value = null,
                 unlocked = false,
-                description = "Nehasiaci oheň: Denná séria 14 dní",
+                description = "Nehasiací oheň: Denná séria 14 dní",
                 profileId = profileId
             ),
             Achievement(
@@ -192,6 +193,51 @@ class GamificationSeeder @Inject constructor(
                 unlocked = false,
                 description = "Šťastlivec: Vyhraj zriedkavú odmenu na kolese šťastia",
                 profileId = profileId
+            ),
+
+            // ══════════════════════════════════════
+            // SESSION XP ACHIEVEMENTS
+            // ══════════════════════════════════════
+
+            Achievement(
+                id = 17,
+                type = "session_xp",
+                value = null,
+                unlocked = false,
+                description = "Dokončená relácia: Získaj XP za dokončenie relácie",
+                profileId = profileId
+            ),
+            Achievement(
+                id = 18,
+                type = "session_xp",
+                value = null,
+                unlocked = false,
+                description = "Správne odpovede: Získaj XP za každú správnu odpoveď",
+                profileId = profileId
+            ),
+            Achievement(
+                id = 19,
+                type = "accuracy",
+                value = null,
+                unlocked = false,
+                description = "Prvé správne: Odpovedz správne aspoň na 5 slov v jednej relácii",
+                profileId = profileId
+            ),
+            Achievement(
+                id = 20,
+                type = "accuracy",
+                value = null,
+                unlocked = false,
+                description = "Trojka: Dosiahni 80%+ správnosť v jednej relácii",
+                profileId = profileId
+            ),
+            Achievement(
+                id = 21,
+                type = "word_count",
+                value = null,
+                unlocked = false,
+                description = "Slovíčkový rekordér: Celkovo 2000 správnych odpovedí",
+                profileId = profileId
             )
         )
     }
@@ -202,7 +248,7 @@ class GamificationSeeder @Inject constructor(
             // SIMPLE RULES
             // ══════════════════════════════════════
 
-            // Rule 1: Perfect session (100% accuracy)
+            // Rule 1: Perfect session (100% accuracy) → 30 XP
             Rule(
                 id = 1,
                 type = RuleType.SIMPLE,
@@ -212,10 +258,11 @@ class GamificationSeeder @Inject constructor(
                     operator = "==",
                     value = "100"
                 ),
-                achievementId = 1
+                achievementId = 1,
+                xpReward = 30
             ),
 
-            // Rule 2: Speed session (under 120 seconds)
+            // Rule 2: Speed session (under 120 seconds) → 25 XP
             Rule(
                 id = 2,
                 type = RuleType.SIMPLE,
@@ -225,10 +272,11 @@ class GamificationSeeder @Inject constructor(
                     operator = "<=",
                     value = "120"
                 ),
-                achievementId = 2
+                achievementId = 2,
+                xpReward = 25
             ),
 
-            // Rule 3: 10 correct in one session
+            // Rule 3: 10 correct in one session → 40 XP
             Rule(
                 id = 3,
                 type = RuleType.SIMPLE,
@@ -238,14 +286,15 @@ class GamificationSeeder @Inject constructor(
                     operator = ">=",
                     value = "10"
                 ),
-                achievementId = 3
+                achievementId = 3,
+                xpReward = 40
             ),
 
             // ══════════════════════════════════════
             // REPETITIVE RULES
             // ══════════════════════════════════════
 
-            // Rule 4: Total 50 correct answers
+            // Rule 4: Total 50 correct answers → 40 XP
             Rule(
                 id = 4,
                 type = RuleType.REPETITIVE,
@@ -255,10 +304,11 @@ class GamificationSeeder @Inject constructor(
                     operator = "sum_>=",
                     value = "50"
                 ),
-                achievementId = 4
+                achievementId = 4,
+                xpReward = 40
             ),
 
-            // Rule 5: Total 200 correct answers
+            // Rule 5: Total 200 correct answers → 40 XP
             Rule(
                 id = 5,
                 type = RuleType.REPETITIVE,
@@ -268,10 +318,11 @@ class GamificationSeeder @Inject constructor(
                     operator = "sum_>=",
                     value = "200"
                 ),
-                achievementId = 5
+                achievementId = 5,
+                xpReward = 40
             ),
 
-            // Rule 6: Total 500 correct answers
+            // Rule 6: Total 500 correct answers → 40 XP
             Rule(
                 id = 6,
                 type = RuleType.REPETITIVE,
@@ -281,10 +332,11 @@ class GamificationSeeder @Inject constructor(
                     operator = "sum_>=",
                     value = "500"
                 ),
-                achievementId = 6
+                achievementId = 6,
+                xpReward = 40
             ),
 
-            // Rule 7: Total 1000 correct answers
+            // Rule 7: Total 1000 correct answers → 40 XP
             Rule(
                 id = 7,
                 type = RuleType.REPETITIVE,
@@ -294,10 +346,11 @@ class GamificationSeeder @Inject constructor(
                     operator = "sum_>=",
                     value = "1000"
                 ),
-                achievementId = 7
+                achievementId = 7,
+                xpReward = 40
             ),
 
-            // Rule 8: 10 sessions completed
+            // Rule 8: 10 sessions completed → 20 XP
             Rule(
                 id = 8,
                 type = RuleType.REPETITIVE,
@@ -306,10 +359,11 @@ class GamificationSeeder @Inject constructor(
                     operator = "count_>=",
                     value = "10"
                 ),
-                achievementId = 8
+                achievementId = 8,
+                xpReward = 20
             ),
 
-            // Rule 9: 50 sessions completed
+            // Rule 9: 50 sessions completed → 20 XP
             Rule(
                 id = 9,
                 type = RuleType.REPETITIVE,
@@ -318,14 +372,15 @@ class GamificationSeeder @Inject constructor(
                     operator = "count_>=",
                     value = "50"
                 ),
-                achievementId = 9
+                achievementId = 9,
+                xpReward = 20
             ),
 
             // ══════════════════════════════════════
             // INTERVAL REPETITIVE RULES
             // ══════════════════════════════════════
 
-            // Rule 10: 3-day streak
+            // Rule 10: 3-day streak → 50 XP
             Rule(
                 id = 10,
                 type = RuleType.INTERVAL_REPETITIVE,
@@ -335,10 +390,11 @@ class GamificationSeeder @Inject constructor(
                     repeatCount = 3,
                     consecutive = true
                 ),
-                achievementId = 10
+                achievementId = 10,
+                xpReward = 50
             ),
 
-            // Rule 11: 7-day streak
+            // Rule 11: 7-day streak → 50 XP
             Rule(
                 id = 11,
                 type = RuleType.INTERVAL_REPETITIVE,
@@ -348,10 +404,11 @@ class GamificationSeeder @Inject constructor(
                     repeatCount = 7,
                     consecutive = true
                 ),
-                achievementId = 11
+                achievementId = 11,
+                xpReward = 50
             ),
 
-            // Rule 12: 14-day streak
+            // Rule 12: 14-day streak → 50 XP
             Rule(
                 id = 12,
                 type = RuleType.INTERVAL_REPETITIVE,
@@ -361,10 +418,11 @@ class GamificationSeeder @Inject constructor(
                     repeatCount = 14,
                     consecutive = true
                 ),
-                achievementId = 12
+                achievementId = 12,
+                xpReward = 50
             ),
 
-            // Rule 13: 30-day streak
+            // Rule 13: 30-day streak → 50 XP
             Rule(
                 id = 13,
                 type = RuleType.INTERVAL_REPETITIVE,
@@ -374,10 +432,11 @@ class GamificationSeeder @Inject constructor(
                     repeatCount = 30,
                     consecutive = true
                 ),
-                achievementId = 13
+                achievementId = 13,
+                xpReward = 50
             ),
 
-            // Rule 14: 100-day streak
+            // Rule 14: 100-day streak → 100 XP
             Rule(
                 id = 14,
                 type = RuleType.INTERVAL_REPETITIVE,
@@ -387,10 +446,11 @@ class GamificationSeeder @Inject constructor(
                     repeatCount = 100,
                     consecutive = true
                 ),
-                achievementId = 14
+                achievementId = 14,
+                xpReward = 100
             ),
 
-            // Rule 15: Early bird — 5 consecutive days with morning study (before 8:00)
+            // Rule 15: Early bird — 5 consecutive days with morning study → 50 XP
             Rule(
                 id = 15,
                 type = RuleType.INTERVAL_REPETITIVE,
@@ -400,10 +460,11 @@ class GamificationSeeder @Inject constructor(
                     repeatCount = 5,
                     consecutive = true
                 ),
-                achievementId = 15
+                achievementId = 15,
+                xpReward = 50
             ),
 
-            // Rule 16: Rare wheel of fortune achievement (triggered by type match)
+            // Rule 16: Rare wheel of fortune achievement → 100 XP
             Rule(
                 id = 16,
                 type = RuleType.SIMPLE,
@@ -413,7 +474,83 @@ class GamificationSeeder @Inject constructor(
                     operator = "==",
                     value = "true"
                 ),
-                achievementId = 16
+                achievementId = 16,
+                xpReward = 100
+            ),
+
+            // ══════════════════════════════════════
+            // SESSION XP RULES (new)
+            // ══════════════════════════════════════
+
+            // Rule 17: Base session XP — every completed session → 50 XP
+            Rule(
+                id = 17,
+                type = RuleType.SIMPLE,
+                conditions = RuleConditions(
+                    behaviorType = "session_complete",
+                    attribute = "total_exercises",
+                    operator = ">=",
+                    value = "1"
+                ),
+                achievementId = 17,
+                xpReward = 50
+            ),
+
+            // Rule 18: Per-correct-answer XP — each correct → 5 XP (multiplied by correct_count)
+            Rule(
+                id = 18,
+                type = RuleType.SIMPLE,
+                conditions = RuleConditions(
+                    behaviorType = "session_complete",
+                    attribute = "correct_count",
+                    operator = ">=",
+                    value = "1",
+                    xpAttribute = "correct_count"
+                ),
+                achievementId = 18,
+                xpReward = 5
+            ),
+
+            // Rule 19: At least 5 correct in one session → 20 XP
+            Rule(
+                id = 19,
+                type = RuleType.SIMPLE,
+                conditions = RuleConditions(
+                    behaviorType = "session_complete",
+                    attribute = "correct_count",
+                    operator = ">=",
+                    value = "5"
+                ),
+                achievementId = 19,
+                xpReward = 20
+            ),
+
+            // Rule 20: 80%+ accuracy in one session → 30 XP
+            Rule(
+                id = 20,
+                type = RuleType.SIMPLE,
+                conditions = RuleConditions(
+                    behaviorType = "session_complete",
+                    attribute = "accuracy",
+                    operator = ">=",
+                    value = "80"
+                ),
+                achievementId = 20,
+                xpReward = 30
+            ),
+
+            // Rule 21: Total 2000 correct answers → 40 XP
+            Rule(
+                id = 21,
+                type = RuleType.REPETITIVE,
+                conditions = RuleConditions(
+                    behaviorType = "session_complete",
+                    attribute = "correct_count",
+                    operator = "sum_>=",
+                    value = "2000"
+                ),
+                achievementId = 21,
+                xpReward = 40
             )
         )
     }

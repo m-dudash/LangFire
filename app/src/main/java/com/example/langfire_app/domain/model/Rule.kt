@@ -28,7 +28,9 @@ data class Rule(
     val id: Int = 0,
     val type: RuleType,
     val conditions: RuleConditions,
-    val achievementId: Int
+    val achievementId: Int,
+    /** XP granted when this rule is satisfied. Stored in the DB, not hardcoded. */
+    val xpReward: Int = 0
 )
 
 /**
@@ -70,5 +72,13 @@ data class RuleConditions(
     val repeatCount: Int? = null,
 
     /** Whether repetitions must be consecutive (for INTERVAL_REPETITIVE) */
-    val consecutive: Boolean = false
+    val consecutive: Boolean = false,
+
+    /**
+     * When set, the engine multiplies [Rule.xpReward] by the integer value
+     * of this attribute from the behavior.
+     * Example: xpAttribute = "correct_count" with xpReward = 5
+     * → grants 5 × correctCount XP.
+     */
+    val xpAttribute: String? = null
 )

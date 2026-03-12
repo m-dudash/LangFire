@@ -2,7 +2,6 @@ package com.example.langfire_app.data.local
 
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
-import com.example.langfire_app.BuildConfig
 import com.example.langfire_app.di.ApplicationScope
 import com.example.langfire_app.data.local.entities.ProfileEntity
 import kotlinx.coroutines.CoroutineScope
@@ -13,7 +12,6 @@ import javax.inject.Provider
 class DatabaseCallback @Inject constructor(
     private val database: Provider<AppDatabase>,
     private val gamificationSeeder: Provider<GamificationSeeder>,
-    private val debugSeeder: Provider<DebugSeeder>,
     @ApplicationScope private val applicationScope: CoroutineScope
 ) : RoomDatabase.Callback() {
 
@@ -26,10 +24,6 @@ class DatabaseCallback @Inject constructor(
 
     private suspend fun populateDatabase() {
         val appDatabase = database.get()
-        if (BuildConfig.DEBUG) {
-            debugSeeder.get().seedIfNeeded()
-            return
-        }
 
         val profileDao = appDatabase.profileDao()
         val courseDao = appDatabase.courseDao()

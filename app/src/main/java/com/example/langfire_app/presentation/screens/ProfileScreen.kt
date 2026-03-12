@@ -625,6 +625,8 @@ private fun AccuracySection(uiState: ProfileUiState) {
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun AchievementsSection(achievements: List<Achievement>) {
+    var selectedAchievement by remember { mutableStateOf<Achievement?>(null) }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -659,20 +661,28 @@ private fun AchievementsSection(achievements: List<Achievement>) {
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(achievements) { achievement ->
-                    AchievementBadge(achievement = achievement)
+                    AchievementBadge(achievement = achievement) { selectedAchievement = it }
                 }
             }
         }
     }
+
+    selectedAchievement?.let { achievement ->
+        AchievementDialog(
+            achievement = achievement,
+            onDismiss = { selectedAchievement = null }
+        )
+    }
 }
 
 @Composable
-private fun AchievementBadge(achievement: Achievement) {
+private fun AchievementBadge(achievement: Achievement, onClick: (Achievement) -> Unit) {
     val isUnlocked = achievement.unlocked
     val bgColor    = if (isUnlocked) FortuneContainer
                      else MaterialTheme.colorScheme.surfaceVariant
 
     Card(
+        onClick = { onClick(achievement) },
         shape  = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = bgColor),
         border = if (isUnlocked)
@@ -710,6 +720,69 @@ private fun AchievementBadge(achievement: Achievement) {
                 maxLines  = 2,
                 overflow  = TextOverflow.Ellipsis
             )
+        }
+    }
+}
+
+@Composable
+private fun AchievementDialog(achievement: Achievement, onDismiss: () -> Unit) {
+    val isUnlocked = achievement.unlocked
+    val buttonColor = if (isUnlocked) FireOrange else Color.Gray.copy(alpha = 0.8f)
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = if (isUnlocked) FortuneContainer else MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.size(80.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            achievement.icon.ifEmpty { "🏆" },
+                            fontSize = 40.sp,
+                            modifier = Modifier.graphicsLayer {
+                                alpha = if (isUnlocked) 1f else 0.32f
+                            }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = achievement.title.ifEmpty { achievement.type },
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center
+                )
+                if (!achievement.description.isNullOrEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = achievement.description,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text("OK", fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            }
         }
     }
 }

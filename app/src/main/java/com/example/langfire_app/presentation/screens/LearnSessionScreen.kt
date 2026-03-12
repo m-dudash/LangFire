@@ -10,6 +10,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Done
@@ -41,12 +43,16 @@ import com.example.langfire_app.data.local.dao.SessionWordItem
 import com.example.langfire_app.domain.srs.SrsEngine
 import com.example.langfire_app.presentation.ui.theme.*
 import com.example.langfire_app.presentation.viewmodels.*
+import com.example.langfire_app.domain.model.EngineResult
+import com.example.langfire_app.domain.model.Achievement
+import androidx.compose.ui.window.Dialog
 
 // ─── Root screen ─────────────────────────────────────────────────────────────
 
 @Composable
 fun SessionScreen(
-    viewModel: LearnViewModel = hiltViewModel()
+    viewModel: LearnViewModel = hiltViewModel(),
+    onFinishClick: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
 
@@ -71,7 +77,8 @@ fun SessionScreen(
                 correctCount = state.correctCount,
                 forgotCount  = state.forgotCount,
                 total        = state.totalInSession,
-                onRestart    = viewModel::restart
+                engineResult = state.engineResult,
+                onFinishClick = onFinishClick
             )
             SessionPhase.EMPTY    -> SessionEmptyScreen()
         }
@@ -995,8 +1002,14 @@ private fun SessionFinishedScreen(
     correctCount: Int,
     forgotCount: Int,
     total: Int,
-    onRestart: () -> Unit
+    engineResult: EngineResult?,
+    onFinishClick: () -> Unit
 ) {
+    var selectedAchievement by remember { mutableStateOf<Achievement?>(null) }
+    
+    val xp = engineResult?.xpGranted ?: 0
+    val achievements = engineResult?.newAchievements ?: emptyList()
+
     val accuracy = if (total > 0) (correctCount * 100f / total).toInt() else 0
     val emoji = when {
         accuracy >= 90 -> "🏆"
@@ -1041,9 +1054,36 @@ private fun SessionFinishedScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(64.dp))
+            Spacer(modifier = Modifier.height(24.dp))
+            if (xp > 0 || achievements.isNotEmpty()) {
+                if (xp > 0) {
+                    Text(
+                        "+$xp XP",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Black,
+                        color = Color(0xFFFFD54F) // Gold color
+                    )
+                }
+                if (achievements.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        items(achievements) { achievement ->
+                            AchievementBadge(achievement) { selectedAchievement = it }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+            } else {
+                Spacer(modifier = Modifier.height(64.dp))
+            }
+
             Button(
-                onClick = onRestart,
+                onClick = onFinishClick,
                 colors  = ButtonDefaults.buttonColors(containerColor = Color.White),
                 shape   = CircleShape,
                 modifier = Modifier
@@ -1052,13 +1092,20 @@ private fun SessionFinishedScreen(
                     .shadow(16.dp, CircleShape, spotColor = Color.White.copy(alpha = 0.5f))
             ) {
                 Text(
-                    "FINISH",
+                    "ДАЛЕЕ",
                     color      = FireOrangeDeep,
                     fontWeight = FontWeight.Black,
                     fontSize   = 18.sp,
                     letterSpacing = 1.sp
                 )
             }
+        }
+        
+        selectedAchievement?.let { achievement ->
+            AchievementDialog(
+                achievement = achievement,
+                onDismiss = { selectedAchievement = null }
+            )
         }
     }
 }
@@ -1069,6 +1116,76 @@ private fun FinishStat(label: String, value: String, color: Color) {
         Text(value, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Black, color = color)
         Spacer(modifier = Modifier.height(8.dp))
         Text(label, style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.8f))
+    }
+}
+
+@Composable
+private fun AchievementBadge(achievement: Achievement, onClick: (Achievement) -> Unit) {
+    Surface(
+        shape = CircleShape,
+        color = Color.White.copy(alpha = 0.2f),
+        modifier = Modifier
+            .size(64.dp)
+            .clickable { onClick(achievement) },
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.4f))
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(achievement.icon.ifEmpty { "🏆" }, fontSize = 28.sp)
+        }
+    }
+}
+
+@Composable
+private fun AchievementDialog(achievement: Achievement, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = FireOrange.copy(alpha = 0.1f),
+                    modifier = Modifier.size(80.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(achievement.icon.ifEmpty { "🏆" }, fontSize = 40.sp)
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = achievement.title.ifEmpty { "Achievement" },
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center
+                )
+                if (!achievement.description.isNullOrEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = achievement.description,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = FireOrange),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text("OK", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
     }
 }
 

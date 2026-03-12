@@ -3,7 +3,7 @@ package com.example.langfire_app.data.repository
 import com.example.langfire_app.data.local.dao.CourseDao
 import com.example.langfire_app.data.local.dao.StatWordItem
 import com.example.langfire_app.data.local.dao.WordProgressDao
-import com.example.langfire_app.domain.engine.GamificationEngine
+import com.example.langfire_app.domain.util.CourseProgressCalculator
 import com.example.langfire_app.domain.model.CourseLevelInfo
 import com.example.langfire_app.domain.model.HomeCourseStats
 import com.example.langfire_app.domain.model.ProfileStats
@@ -38,7 +38,7 @@ class StatsRepositoryImpl @Inject constructor(
                 )
                 if (levelStats.none { it.totalWords > 0 }) return@mapNotNull null
 
-                val progress = GamificationEngine.computeCourseProgress(levelStats)
+                val progress = CourseProgressCalculator.computeCourseProgress(levelStats)
                 CourseLevelInfo(
                     courseName           = course.name,
                     courseIcon           = course.icon,

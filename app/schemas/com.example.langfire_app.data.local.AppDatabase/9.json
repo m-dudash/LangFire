@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 8,
-    "identityHash": "13c80974ce9fa842d8f24be975f5bb9e",
+    "version": 9,
+    "identityHash": "d860bbf98f27f85987beecbc47b65179",
     "entities": [
       {
         "tableName": "language",
@@ -171,7 +171,7 @@
       },
       {
         "tableName": "words",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `word` TEXT NOT NULL, `plural` TEXT, `audio_path` TEXT, `article_id` INTEGER NOT NULL, `word_type_id` INTEGER NOT NULL, `unit_id` INTEGER NOT NULL, `level_id` INTEGER NOT NULL, `language_id` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`article_id`) REFERENCES `article`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION , FOREIGN KEY(`word_type_id`) REFERENCES `word_type`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION , FOREIGN KEY(`unit_id`) REFERENCES `unit`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION , FOREIGN KEY(`level_id`) REFERENCES `level`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION , FOREIGN KEY(`language_id`) REFERENCES `language`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `word` TEXT NOT NULL, `plural` TEXT, `audio_path` TEXT, `article_id` INTEGER, `word_type_id` INTEGER, `unit_id` INTEGER NOT NULL, `level_id` INTEGER NOT NULL, `language_id` INTEGER NOT NULL, `gender_id` INTEGER, PRIMARY KEY(`id`), FOREIGN KEY(`article_id`) REFERENCES `article`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION , FOREIGN KEY(`word_type_id`) REFERENCES `word_type`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION , FOREIGN KEY(`unit_id`) REFERENCES `unit`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION , FOREIGN KEY(`level_id`) REFERENCES `level`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION , FOREIGN KEY(`language_id`) REFERENCES `language`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION , FOREIGN KEY(`gender_id`) REFERENCES `gender`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
         "fields": [
           {
             "fieldPath": "id",
@@ -201,13 +201,13 @@
             "fieldPath": "articleId",
             "columnName": "article_id",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": false
           },
           {
             "fieldPath": "wordTypeId",
             "columnName": "word_type_id",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": false
           },
           {
             "fieldPath": "unitId",
@@ -226,6 +226,12 @@
             "columnName": "language_id",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "genderId",
+            "columnName": "gender_id",
+            "affinity": "INTEGER",
+            "notNull": false
           }
         ],
         "primaryKey": {
@@ -286,6 +292,17 @@
             "onUpdate": "NO ACTION",
             "columns": [
               "language_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "gender",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "gender_id"
             ],
             "referencedColumns": [
               "id"
@@ -783,12 +800,38 @@
         },
         "indices": [],
         "foreignKeys": []
+      },
+      {
+        "tableName": "gender",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `name` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
       }
     ],
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '13c80974ce9fa842d8f24be975f5bb9e')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd860bbf98f27f85987beecbc47b65179')"
     ]
   }
 }

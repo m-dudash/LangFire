@@ -8,7 +8,6 @@ import com.example.langfire_app.domain.repository.RuleRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 import java.util.concurrent.TimeUnit
-import kotlin.random.Random
 
 /**
  * ═══════════════════════════════════════════════════════════════════
@@ -31,13 +30,17 @@ import kotlin.random.Random
  * Architecture note: This class lives in the Domain Layer and depends only
  * on repository interfaces (not implementations). It has no Android or
  * framework dependencies and can be unit-tested independently.
+ *
+ * XP values are defined in the [Rule.xpReward] field (stored in the DB),
+ * NOT hardcoded in this class.
  */
 @Singleton
 class GamificationEngine @Inject constructor(
     private val ruleRepository: RuleRepository,
     private val behaviorRepository: BehaviorRepository,
     private val achievementRepository: AchievementRepository,
-    private val profileRepository: ProfileRepository
+    private val profileRepository: ProfileRepository,
+    private val fortuneWheelMechanic: FortuneWheelMechanic
 ) {
 
     /**
@@ -48,8 +51,10 @@ class GamificationEngine @Inject constructor(
      * 2. Loads all gamification rules
      * 3. Evaluates each rule against the behavior (and history if needed)
      * 4. Grants/updates achievements for satisfied rules
-     * 5. Awards XP for newly unlocked achievements
-     * 6. Returns a summary of all rewards granted
+     * 5. Awards XP defined in each satisfied rule
+     * 6. Applies an active XP multiplier (if any)
+     * 7. Updates streak
+     * 8. Returns a summary of all rewards granted
      *
      * @param behavior The behavior to process (e.g., session_complete with attributes)
      * @return EngineResult containing all rewards and updates
@@ -59,14 +64,15 @@ class GamificationEngine @Inject constructor(
         val savedId = behaviorRepository.saveBehavior(behavior)
         val savedBehavior = behavior.copy(id = savedId.toInt())
 
+        // Step 2: Delegate fortune spin to its own mechanic
         if (savedBehavior.type == "fortune_spin") {
-            return processFortuneSpin(savedBehavior.profileId)
+            return fortuneWheelMechanic.processSpin(savedBehavior.profileId)
         }
 
-        // Step 2: Load all rules
+        // Step 3: Load all rules
         val rules = ruleRepository.getAllRules()
 
-        // Step 3 & 4: Evaluate rules and collect results
+        // Step 4 & 5: Evaluate rules, collect results, calculate XP
         val newAchievements = mutableListOf<Achievement>()
         val updatedAchievements = mutableListOf<Achievement>()
         var totalXpGranted = 0
@@ -78,10 +84,11 @@ class GamificationEngine @Inject constructor(
                 when (result) {
                     is RewardResult.NewlyUnlocked -> {
                         newAchievements.add(result.achievement)
-                        totalXpGranted += calculateXpForAchievement(result.achievement)
+                        totalXpGranted += computeRuleXp(rule, savedBehavior)
                     }
                     is RewardResult.Updated -> {
                         updatedAchievements.add(result.achievement)
+                        totalXpGranted += computeRuleXp(rule, savedBehavior)
                     }
                     is RewardResult.AlreadyUnlocked -> {
                         // No action needed
@@ -90,7 +97,7 @@ class GamificationEngine @Inject constructor(
             }
         }
 
-        // Step 5: Award XP
+        // Step 6: Apply XP multiplier and persist
         if (totalXpGranted > 0) {
             val finalXp = applyXpMultiplierIfActive(savedBehavior.profileId, totalXpGranted)
             if (finalXp > 0) {
@@ -98,7 +105,7 @@ class GamificationEngine @Inject constructor(
             }
         }
 
-        // Step 6: Check & update streak (always check on relevant behaviors)
+        // Step 7: Check & update streak
         val streakResult = updateStreakIfNeeded(savedBehavior)
 
         return EngineResult(
@@ -150,8 +157,6 @@ class GamificationEngine @Inject constructor(
         val existingAchievement = achievementRepository.getAchievementById(rule.achievementId)
 
         return if (existingAchievement == null) {
-            // Achievement doesn't exist yet — create as unlocked
-            // This handles the case where achievements are created dynamically
             val newAchievement = Achievement(
                 id = rule.achievementId,
                 type = "dynamic",
@@ -163,12 +168,10 @@ class GamificationEngine @Inject constructor(
             achievementRepository.saveAchievement(newAchievement)
             RewardResult.NewlyUnlocked(newAchievement)
         } else if (!existingAchievement.unlocked) {
-            // Achievement exists but is locked — unlock it
             val unlockedAchievement = existingAchievement.copy(unlocked = true)
             achievementRepository.updateAchievement(unlockedAchievement)
             RewardResult.NewlyUnlocked(unlockedAchievement)
         } else {
-            // Achievement already unlocked — update value (progressive)
             val updatedAchievement = existingAchievement.copy(
                 value = (existingAchievement.value ?: 0) + 1
             )
@@ -178,50 +181,33 @@ class GamificationEngine @Inject constructor(
     }
 
     /**
-     * Calculate XP reward for a newly unlocked achievement.
-     * XP values can be tied to achievement types.
-     */
-    private fun calculateXpForAchievement(achievement: Achievement): Int {
-        return when (achievement.type) {
-            "streak"     -> XP_STREAK_ACHIEVEMENT
-            "accuracy"   -> XP_ACCURACY_ACHIEVEMENT
-            "word_count" -> XP_WORD_COUNT_ACHIEVEMENT
-            "speed"      -> XP_SPEED_ACHIEVEMENT
-            "rare"       -> XP_RARE_ACHIEVEMENT
-            else         -> XP_DEFAULT_ACHIEVEMENT
-        }
-    }
-
-    /**
      * Update the user's daily streak if applicable.
      *
      * Uses IntervalRepetitiveRuleEvaluator to calculate the current streak
-     * based on "daily_activity" behaviors, then updates profile.
+     * based on streak-related behaviors, then updates profile.
      *
      * @return Pair(streakUpdated, newStreakDays)
      */
     private suspend fun updateStreakIfNeeded(behavior: Behavior): Pair<Boolean, Int> {
-        // Only update streak on certain behavior types
         val streakBehaviorTypes = setOf("session_complete", "app_open", "daily_activity")
         if (behavior.type !in streakBehaviorTypes) return Pair(false, 0)
 
         val profile = profileRepository.getProfileById(behavior.profileId) ?: return Pair(false, 0)
 
-        // Get all daily activity behaviors for streak calculation
         val allBehaviors = behaviorRepository.getBehaviorsByProfile(behavior.profileId)
         val streakBehaviors = allBehaviors.filter { it.type in streakBehaviorTypes }
 
         val currentStreak = IntervalRepetitiveRuleEvaluator.getCurrentStreak(
-            behaviors = streakBehaviors,
-            behaviorType = behavior.type,
-            interval = "daily",
-            currentTimestamp = behavior.timestamp
+            behaviors        = streakBehaviors,
+            behaviorType     = behavior.type,
+            interval         = "daily",
+            currentTimestamp  = behavior.timestamp
         )
 
         if (currentStreak != profile.streakDays) {
             profileRepository.updateStreak(
-                profileId = behavior.profileId,
-                streakDays = currentStreak,
+                profileId      = behavior.profileId,
+                streakDays     = currentStreak,
                 lastActiveDate = behavior.timestamp
             )
             return Pair(true, currentStreak)
@@ -253,95 +239,31 @@ class GamificationEngine @Inject constructor(
 
         return if (streakBehaviors.isNotEmpty()) {
             IntervalRepetitiveRuleEvaluator.getCurrentStreak(
-                behaviors = streakBehaviors,
-                behaviorType = streakBehaviors.first().type,
-                interval = "daily"
+                behaviors     = streakBehaviors,
+                behaviorType  = streakBehaviors.first().type,
+                interval      = "daily"
             )
         } else {
             0
         }
     }
 
+    // ── Internal helpers ─────────────────────────────────────────────────────
+
     /**
-     * FORTUNE ORIENTED CODE
+     * Compute XP for a single satisfied rule.
+     *
+     * If [RuleConditions.xpAttribute] is set, multiplies [Rule.xpReward]
+     * by the integer value of that attribute in the behavior.
+     * Otherwise returns [Rule.xpReward] as-is.
      */
-
-    private suspend fun processFortuneSpin(profileId: Int): EngineResult {
-        val now = System.currentTimeMillis()
-
-        // IMPORTANT: the behavior is already saved to DB before this function is called
-        // (see processBehavior step 1). So we check size > 1, not isNotEmpty(),
-        // to detect whether a *previous* spin today exists beyond the current one.
-        val spinsToday = behaviorRepository.getBehaviorsByTypeAfter(
-            profileId = profileId,
-            type = "fortune_spin",
-            fromTimestamp = startOfToday(now)
-        )
-
-        if (spinsToday.size > 1) {
-            // Already spun today before this attempt — return empty reward
-            return EngineResult()
+    private fun computeRuleXp(rule: Rule, behavior: Behavior): Int {
+        val xpAttr = rule.conditions.xpAttribute
+        if (xpAttr != null) {
+            val multiplier = behavior.attributes[xpAttr]?.toIntOrNull() ?: 1
+            return rule.xpReward * multiplier
         }
-
-        val hasUnique = achievementRepository
-            .getAchievementsByType(profileId, UNIQUE_FORTUNE_ACHIEVEMENT_TYPE)
-            .isNotEmpty()
-
-        val options = mutableListOf(
-            RewardOption(FortuneReward.Multiplier(2), 20.0),
-            RewardOption(FortuneReward.Multiplier(3), 12.0),
-            RewardOption(FortuneReward.Multiplier(5), 6.0),
-            RewardOption(FortuneReward.Xp(200), 22.0),
-            RewardOption(FortuneReward.Xp(300), 12.0),
-            RewardOption(FortuneReward.Xp(500), 6.0)
-        )
-
-        if (!hasUnique) {
-            options.add(RewardOption(FortuneReward.UniqueAchievement, 0.2))
-        }
-
-        val reward = pickWeightedReward(options)
-
-        when (reward) {
-            is FortuneReward.Xp -> profileRepository.addXp(profileId, reward.amount)
-            is FortuneReward.Multiplier -> {
-                val expiresAt = now + TimeUnit.HOURS.toMillis(FORTUNE_MULTIPLIER_HOURS)
-                // Always clear any existing (possibly expired) multiplier first so the new
-                // one is never silently blocked by a stale DB value.
-                profileRepository.clearXpMultiplier(profileId)
-                profileRepository.setXpMultiplier(profileId, reward.multiplier, expiresAt)
-            }
-            FortuneReward.UniqueAchievement -> {
-                val achievement = Achievement(
-                    type = UNIQUE_FORTUNE_ACHIEVEMENT_TYPE,
-                    unlocked = true,
-                    description = "Unique fortune wheel reward",
-                    profileId = profileId
-                )
-                achievementRepository.saveAchievement(achievement)
-            }
-        }
-
-        return EngineResult(
-            xpGranted = if (reward is FortuneReward.Xp) reward.amount else 0,
-            fortuneReward = reward
-        )
-    }
-
-    private fun startOfToday(now: Long): Long {
-        val days = TimeUnit.MILLISECONDS.toDays(now)
-        return TimeUnit.DAYS.toMillis(days)
-    }
-
-    private fun pickWeightedReward(options: List<RewardOption>): FortuneReward {
-        val total = options.sumOf { it.weight }
-        val r = Random.nextDouble(total)
-        var acc = 0.0
-        for (option in options) {
-            acc += option.weight
-            if (r <= acc) return option.reward
-        }
-        return options.last().reward
+        return rule.xpReward
     }
 
     private suspend fun applyXpMultiplierIfActive(profileId: Int, baseXp: Int): Int {
@@ -360,17 +282,6 @@ class GamificationEngine @Inject constructor(
         return baseXp
     }
 
-    private fun isSameDay(a: Long, b: Long): Boolean {
-        val dayA = TimeUnit.MILLISECONDS.toDays(a)
-        val dayB = TimeUnit.MILLISECONDS.toDays(b)
-        return dayA == dayB
-    }
-
-    private data class RewardOption(
-        val reward: FortuneReward,
-        val weight: Double
-    )
-
     /**
      * Sealed class representing the result of processing a reward.
      */
@@ -378,76 +289,5 @@ class GamificationEngine @Inject constructor(
         data class NewlyUnlocked(val achievement: Achievement) : RewardResult()
         data class Updated(val achievement: Achievement) : RewardResult()
         data object AlreadyUnlocked : RewardResult()
-    }
-
-    companion object {
-        // XP values for different achievement types
-        const val XP_STREAK_ACHIEVEMENT = 50
-        const val XP_ACCURACY_ACHIEVEMENT = 30
-        const val XP_WORD_COUNT_ACHIEVEMENT = 40
-        const val XP_SPEED_ACHIEVEMENT = 25
-        const val XP_RARE_ACHIEVEMENT = 100
-        const val XP_DEFAULT_ACHIEVEMENT = 20
-
-        const val UNIQUE_FORTUNE_ACHIEVEMENT_TYPE = "unique_fortune_reward"
-        const val FORTUNE_MULTIPLIER_HOURS = 4L
-
-        /**
-         * Minimum fraction of a level's words that must be mastered
-         * before the level counts as "completed" for CEFR purposes.
-         */
-        const val LEVEL_MASTERY_THRESHOLD = 0.8f
-
-        /**
-         * Typed result of [computeCourseProgress].
-         *
-         * @param achievedLevel          Highest CEFR level fully completed; null = nothing yet.
-         * @param targetLevel            Next level to work towards; null = C2 already mastered.
-         * @param wordsLearnedInTarget   Words mastered in [targetLevel].
-         * @param totalWordsInTarget     Total words in [targetLevel].
-         */
-        data class CourseLevelProgress(
-            val achievedLevel: String?,
-            val targetLevel: String?,
-            val wordsLearnedInTarget: Int,
-            val totalWordsInTarget: Int
-        )
-
-        /**
-         * Computes the full progression state for a course from raw per-level word stats.
-         *
-         * Algorithm (levels must be ordered A1 → C2 by the DAO query):
-         *  1. Walk levels in ascending order.
-         *  2. A level is *completed* when learnedWords / totalWords ≥ [masteryRatio].
-         *  3. [achievedLevel] = highest consecutive completed level.
-         *  4. [targetLevel]   = first non-empty level that is NOT yet completed.
-         *  5. If all levels are completed, [targetLevel] is null (mastery reached).
-         *  6. If no level is completed yet, [achievedLevel] is null.
-         */
-        fun computeCourseProgress(
-            levelStats: List<com.example.langfire_app.data.local.entities.WordLevelProgress>,
-            masteryRatio: Float = LEVEL_MASTERY_THRESHOLD
-        ): CourseLevelProgress {
-            var achievedLevel: String? = null
-            var targetStat: com.example.langfire_app.data.local.entities.WordLevelProgress? = null
-
-            for (stat in levelStats) {
-                if (stat.totalWords == 0) continue
-                val ratio = stat.learnedWords.toFloat() / stat.totalWords
-                if (ratio >= masteryRatio) {
-                    achievedLevel = stat.levelName
-                } else {
-                    targetStat = stat
-                    break
-                }
-            }
-
-            return CourseLevelProgress(
-                achievedLevel        = achievedLevel,
-                targetLevel          = targetStat?.levelName,
-                wordsLearnedInTarget = targetStat?.learnedWords ?: 0,
-                totalWordsInTarget   = targetStat?.totalWords   ?: 0
-            )
-        }
     }
 }

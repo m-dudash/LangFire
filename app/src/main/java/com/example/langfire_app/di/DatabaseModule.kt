@@ -32,7 +32,7 @@ object DatabaseModule {
         )
             .createFromAsset("databases/app_database.db")
 //            .fallbackToDestructiveMigration()
-//            .addCallback(callback)
+            .addCallback(callback)
             .build()
     }
 

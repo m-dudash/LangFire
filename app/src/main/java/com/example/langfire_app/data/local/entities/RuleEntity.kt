@@ -15,5 +15,6 @@ data class RuleEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val type: String,
     val conditions: String,
-    @ColumnInfo(name = "achievement_id") val achievementId: Int
+    @ColumnInfo(name = "achievement_id") val achievementId: Int,
+    @ColumnInfo(name = "xp_reward", defaultValue = "0") val xpReward: Int = 0
 )

@@ -1,5 +1,6 @@
 package com.example.langfire_app.data.local
 
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import com.example.langfire_app.data.local.dao.*
@@ -21,9 +22,14 @@ import com.example.langfire_app.data.local.entities.*
         RuleEntity::class,
         CourseEntity::class,
         AppSettingEntity::class,
+        GenderEntity::class,
     ],
-    version = 7,
-    exportSchema = true
+    version = 9,
+    exportSchema = true,
+    autoMigrations = [
+        AutoMigration(from = 7, to = 8),
+        AutoMigration(from = 8, to = 9)
+    ]
 )
 abstract class AppDatabase : RoomDatabase() {
 

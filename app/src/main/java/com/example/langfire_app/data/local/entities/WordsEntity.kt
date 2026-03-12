@@ -12,7 +12,8 @@ import androidx.room.PrimaryKey
         ForeignKey(entity = WordTypeEntity::class, parentColumns = ["id"], childColumns = ["word_type_id"]),
         ForeignKey(entity = UnitEntity::class, parentColumns = ["id"], childColumns = ["unit_id"]),
         ForeignKey(entity = LevelEntity::class, parentColumns = ["id"], childColumns = ["level_id"]),
-        ForeignKey(entity = LanguageEntity::class, parentColumns = ["id"], childColumns = ["language_id"])
+        ForeignKey(entity = LanguageEntity::class, parentColumns = ["id"], childColumns = ["language_id"]),
+        ForeignKey(entity = GenderEntity::class, parentColumns = ["id"], childColumns = ["gender_id"])
     ]
 )
 data class WordsEntity(
@@ -20,9 +21,10 @@ data class WordsEntity(
     val word: String,
     val plural: String?,
     @ColumnInfo(name = "audio_path") val audioPath: String?,
-    @ColumnInfo(name = "article_id") val articleId: Int,
-    @ColumnInfo(name = "word_type_id") val wordTypeId: Int,
+    @ColumnInfo(name = "article_id") val articleId: Int?,
+    @ColumnInfo(name = "word_type_id") val wordTypeId: Int?,
     @ColumnInfo(name = "unit_id") val unitId: Int,
     @ColumnInfo(name = "level_id") val levelId: Int,
-    @ColumnInfo(name = "language_id") val languageId: Int
+    @ColumnInfo(name = "language_id") val languageId: Int,
+    @ColumnInfo(name = "gender_id") val genderId: Int?
 )

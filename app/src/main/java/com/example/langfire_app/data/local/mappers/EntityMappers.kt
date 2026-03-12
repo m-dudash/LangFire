@@ -113,7 +113,8 @@ object EntityMappers {
             id = id,
             type = ruleType,
             conditions = parsedConditions,
-            achievementId = achievementId
+            achievementId = achievementId,
+            xpReward = xpReward
         )
     }
 
@@ -121,7 +122,8 @@ object EntityMappers {
         id = id,
         type = type.name,
         conditions = gson.toJson(conditions),
-        achievementId = achievementId
+        achievementId = achievementId,
+        xpReward = xpReward
     )
 
     // ──────────────────────────────────────────────

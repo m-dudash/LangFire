@@ -42,7 +42,14 @@ fun LangFireNavGraph(navController: NavHostController) {
             )
         }
         composable(Screen.Session.route) {
-            SessionScreen()
+            SessionScreen(
+                onFinishClick = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Home.route) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                }
+            )
         }
         composable(Screen.Profile.route) {
             ProfileScreen(

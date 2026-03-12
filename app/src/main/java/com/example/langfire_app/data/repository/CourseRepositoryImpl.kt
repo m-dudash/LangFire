@@ -5,7 +5,7 @@ import com.example.langfire_app.data.local.dao.UnitDao
 import com.example.langfire_app.data.local.dao.WordProgressDao
 import com.example.langfire_app.data.local.mappers.EntityMappers.toDomain
 import com.example.langfire_app.data.local.mappers.EntityMappers.toEntity
-import com.example.langfire_app.domain.engine.GamificationEngine
+import com.example.langfire_app.domain.util.CourseProgressCalculator
 import com.example.langfire_app.domain.model.Course
 import com.example.langfire_app.domain.model.LibraryLevelSection
 import com.example.langfire_app.domain.model.LibraryUnit
@@ -37,7 +37,7 @@ class CourseRepositoryImpl @Inject constructor(
             courseId = courseId,
             threshold = 0.8f
         )
-        val progressInfo = GamificationEngine.computeCourseProgress(levelStats)
+        val progressInfo = CourseProgressCalculator.computeCourseProgress(levelStats)
 
         val levelsRank = listOf("A1", "A2", "B1", "B2", "C1", "C2")
         val currentLevelIndex = levelsRank.indexOf(progressInfo.achievedLevel ?: "")
