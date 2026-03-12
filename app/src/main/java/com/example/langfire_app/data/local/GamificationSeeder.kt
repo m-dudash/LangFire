@@ -89,6 +89,14 @@ class GamificationSeeder @Inject constructor(
                 profileId = profileId
             ),
             Achievement(
+                id = 44,
+                type = "unique_fortune_reward",
+                value = null,
+                unlocked = true,
+                description = "TST",
+                profileId = profileId
+            ),
+            Achievement(
                 id = 5,
                 type = "word_count",
                 value = null,

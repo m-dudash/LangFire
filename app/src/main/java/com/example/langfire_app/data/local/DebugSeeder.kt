@@ -360,7 +360,7 @@ class DebugSeeder @Inject constructor(
 
     private companion object {
         const val DEBUG_SEED_KEY = "debug_seed_v1"
-        const val DEBUG_SEED_VERSION = "2"
+        const val DEBUG_SEED_VERSION = "3"
         const val WORDS_PER_COURSE = 60
         const val WORDS_PER_UNIT = 10
         const val WORDS_PER_LEVEL = 10

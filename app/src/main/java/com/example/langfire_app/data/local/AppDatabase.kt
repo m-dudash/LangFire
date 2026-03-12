@@ -2,7 +2,9 @@ package com.example.langfire_app.data.local
 
 import androidx.room.AutoMigration
 import androidx.room.Database
+import androidx.room.DeleteColumn
 import androidx.room.RoomDatabase
+import androidx.room.migration.AutoMigrationSpec
 import com.example.langfire_app.data.local.dao.*
 import com.example.langfire_app.data.local.entities.*
 
@@ -24,15 +26,20 @@ import com.example.langfire_app.data.local.entities.*
         AppSettingEntity::class,
         GenderEntity::class,
     ],
-    version = 10,
+    version = 12,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 7, to = 8),
         AutoMigration(from = 8, to = 9),
-        AutoMigration(from = 9, to = 10)
+        AutoMigration(from = 9, to = 10),
+        AutoMigration(from = 10, to = 11),
+        AutoMigration(from = 11, to = 12, spec = AppDatabase.DeleteSuperWinColumn::class)
     ]
 )
 abstract class AppDatabase : RoomDatabase() {
+
+    @DeleteColumn(tableName = "profile", columnName = "has_super_win")
+    class DeleteSuperWinColumn : AutoMigrationSpec
 
     // Registration of DAOs
     abstract fun profileDao(): ProfileDao

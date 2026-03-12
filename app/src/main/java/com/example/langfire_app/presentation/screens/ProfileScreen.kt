@@ -2,7 +2,12 @@ package com.example.langfire_app.presentation.screens
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -19,14 +24,24 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import com.example.langfire_app.R
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -34,6 +49,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -45,6 +61,24 @@ import com.example.langfire_app.domain.model.Profile
 import com.example.langfire_app.presentation.ui.theme.*
 import com.example.langfire_app.presentation.viewmodels.ProfileUiState
 import com.example.langfire_app.presentation.viewmodels.ProfileViewModel
+import kotlin.math.cos
+import kotlin.math.sin
+import java.io.File
+import java.io.FileOutputStream
+import java.util.UUID
+
+private fun copyUriToAppStorage(context: android.content.Context, uri: Uri): String? {
+    return try {
+        val dir = File(context.filesDir, "avatars").also { it.mkdirs() }
+        val dest = File(dir, "avatar_${UUID.randomUUID()}.jpg")
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            FileOutputStream(dest).use { output -> input.copyTo(output) }
+        }
+        dest.absolutePath
+    } catch (e: Exception) {
+        null
+    }
+}
 
 @Composable
 fun ProfileScreen(
@@ -311,7 +345,7 @@ private fun ProfileContent(uiState: ProfileUiState, onUpdateProfile: (String, St
             .statusBarsPadding(),
         contentPadding = PaddingValues(bottom = 48.dp)
     ) {
-        item { ProfileHeroSection(profile = profile, onUpdateProfile = onUpdateProfile) }
+        item { ProfileHeroSection(profile = profile, uiState = uiState, onUpdateProfile = onUpdateProfile) }
         item { Spacer(Modifier.height(20.dp)) }
         item { StatsSection(uiState = uiState) }
         item { Spacer(Modifier.height(20.dp)) }
@@ -327,8 +361,19 @@ private fun ProfileContent(uiState: ProfileUiState, onUpdateProfile: (String, St
 // HERO SECTION: Avatar + Name + Streak
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
-private fun ProfileHeroSection(profile: Profile, onUpdateProfile: (String, String?) -> Unit) {
+private fun ProfileHeroSection(profile: Profile, uiState: ProfileUiState, onUpdateProfile: (String, String?) -> Unit) {
     var showEditDialog by remember { mutableStateOf(false) }
+
+    val interactionSource = remember { MutableInteractionSource() }
+    val isSuperWinActive = uiState.hasSuperWin || interactionSource.collectIsPressedAsState().value
+
+    // XP-style animations for the frame
+    val infiniteTransition = rememberInfiniteTransition(label = "superWinFrame")
+    val frameRotation by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(3000, easing = LinearEasing)),
+        label = "rotation"
+    )
 
     if (showEditDialog) {
         EditProfileDialog(
@@ -345,98 +390,238 @@ private fun ProfileHeroSection(profile: Profile, onUpdateProfile: (String, Strin
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(200.dp)
+            .height(280.dp) // Increased height to reach closer to stats
     ) {
-        // Background gradient wash
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(160.dp)
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            FireOrange.copy(alpha = 0.22f),
-                            Color.Transparent
+        // Background Hero Area
+        if (isSuperWinActive) {
+            // UNIQUE THEME IMAGE (Fades at bottom)
+            AsyncImage(
+                model = R.drawable.super_win_bg,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(280.dp) // Covers full hero section
+                    .drawWithContent {
+                        drawContent()
+                        // Smoothly fade to white background at the bottom
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, Color.White),
+                                startY = size.height * 0.65f, // Fade starts much later
+                                endY = size.height
+                            )
+                        )
+                    },
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            // Standard gradient wash
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                FireOrange.copy(alpha = 0.5f), 
+                                FireOrange.copy(alpha = 0.2f), 
+                                Color.Transparent
+                            )
                         )
                     )
-                )
-        )
+            )
+        }
 
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(CircleShape)
-                    .background(
-                        brush = Brush.linearGradient(
-                            listOf(FireOrange, FireOrangeDeep)
-                        )
-                    )
-                    .clickable { showEditDialog = true }
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
             ) {
-                if (!profile.avatarPath.isNullOrEmpty()) {
-                    AsyncImage(
-                        model = profile.avatarPath,
-                        contentDescription = "Profile Picture",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    val initials = profile.name
-                        .trim()
-                        .split(" ")
-                        .take(2)
-                        .joinToString("") { it.firstOrNull()?.uppercase() ?: "" }
-                        .ifEmpty { "?" }
-                    Text(
-                        text = initials,
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White
-                        )
+                // Circular "Try Super Win" preview button
+                if (!uiState.hasSuperWin) {
+                    TrySuperWinButton(
+                        interactionSource = interactionSource,
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = 20.dp)
                     )
                 }
-                
-                // Small edit icon outline/overlay
+
+                // Avatar Container
                 Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .size(24.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surface)
-                        .padding(4.dp)
+                    modifier = Modifier.size(86.dp), // Slightly larger to fit frame
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit Profile",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    // Moving Frame (XP Multiplier Style)
+                    if (isSuperWinActive) {
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            rotate(frameRotation) {
+                                drawCircle(
+                                    brush = Brush.sweepGradient(
+                                        listOf(GoldXP, FireOrange, FireOrangeDeep, GoldXP)
+                                    ),
+                                    style = Stroke(width = 5.dp.toPx())
+                                )
+                            }
+                        }
+                    }
+
+                    // Avatar Circle
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(76.dp)
+                            .clip(CircleShape)
+                            .background(
+                                brush = Brush.linearGradient(
+                                    if (isSuperWinActive) listOf(GoldXP, FireOrangeDeep)
+                                    else listOf(FireOrange, FireOrangeDeep)
+                                )
+                            )
+                            .clickable { showEditDialog = true }
+                    ) {
+                        if (!profile.avatarPath.isNullOrEmpty()) {
+                            AsyncImage(
+                                model = profile.avatarPath,
+                                contentDescription = "Profile Picture",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            val initials = profile.name
+                                .trim()
+                                .split(" ")
+                                .take(2)
+                                .joinToString("") { it.firstOrNull()?.uppercase() ?: "" }
+                                .ifEmpty { "?" }
+                            Text(
+                                text = initials,
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color.White
+                                )
+                            )
+                        }
+                    }
+
+                    // Edit Icon (On a higher layer/after frame)
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(26.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit Profile",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(16.dp))
 
             // Name + streak badge
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = profile.name,
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Spacer(Modifier.width(10.dp))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                // Name Plate (Surface)
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (isSuperWinActive) FireOrange.copy(alpha = 0.15f) else Color.Transparent,
+                    border = if (isSuperWinActive) BorderStroke(1.5.dp, GoldXP.copy(alpha = 0.5f)) else null
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+
+                        Text(
+                            text = profile.name,
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.ExtraBold
+                            ),
+                            color = if (isSuperWinActive) FireOrangeDeep else MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                }
+                
+                Spacer(Modifier.height(8.dp))
                 ProfileStreakBadge(streakDays = profile.streakDays)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrySuperWinButton(
+    interactionSource: MutableInteractionSource,
+    modifier: Modifier = Modifier
+) {
+    val pattern = "SUPER WIN ✦ "
+    val label = pattern.repeat(4) // 4 repetitions to close the circle perfectly
+
+    Box(
+        modifier = modifier.size(92.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        AndroidView(
+            factory = { ctx ->
+                object : android.view.View(ctx) {
+                    override fun onDraw(canvas: android.graphics.Canvas) {
+                        val cx = width / 2f
+                        val cy = height / 2f
+                        val radius = cx - 9.dp.value * resources.displayMetrics.density
+
+                        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                            color = android.graphics.Color.argb(255, 255, 111, 0)
+                            textSize = 8.5f * resources.displayMetrics.density
+                            typeface = android.graphics.Typeface.create(
+                                android.graphics.Typeface.DEFAULT_BOLD,
+                                android.graphics.Typeface.BOLD
+                            )
+                            letterSpacing = 0.02f
+                        }
+
+                        val path = android.graphics.Path().apply {
+                            addCircle(cx, cy, radius, android.graphics.Path.Direction.CW)
+                        }
+
+                        // Calculate circumference and text width to adjust start offset if needed, 
+                        // but repeating 4 times fills the 360deg loop well.
+                        canvas.rotate(-90f, cx, cy)
+                        canvas.drawTextOnPath(label, path, 0f, 0f, paint)
+                    }
+                }.apply { setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null) }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // Inner circle button
+        Surface(
+            onClick = {},
+            modifier = Modifier.size(52.dp),
+            shape = CircleShape,
+            color = FireOrange,
+            shadowElevation = 4.dp,
+            interactionSource = interactionSource
+        ) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                Text(
+                    "HOLD\n&\nTRY",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        fontSize = 9.5.sp
+                    ),
+                    textAlign = TextAlign.Center,
+                    lineHeight = 10.sp
+                )
             }
         }
     }
@@ -1078,12 +1263,19 @@ fun EditProfileDialog(
     onDismiss: () -> Unit,
     onSave: (String, String?) -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     var name by remember { mutableStateOf(currentName) }
-    var avatarUri by remember { mutableStateOf<Uri?>(if (currentAvatar != null) Uri.parse(currentAvatar) else null) }
+    var avatarPath by remember { mutableStateOf<String?>(currentAvatar) }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
-        onResult = { uri -> if(uri != null) avatarUri = uri }
+        onResult = { uri ->
+            if (uri != null) {
+                // Copy to app-private storage so URI doesn't expire
+                val copied = copyUriToAppStorage(context, uri)
+                if (copied != null) avatarPath = copied
+            }
+        }
     )
 
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
@@ -1115,9 +1307,9 @@ fun EditProfileDialog(
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    if (avatarUri != null) {
+                    if (avatarPath != null) {
                         AsyncImage(
-                            model = avatarUri,
+                            model = avatarPath,
                             contentDescription = "Profile Picture",
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
@@ -1156,7 +1348,7 @@ fun EditProfileDialog(
                         Text("Cancel")
                     }
                     Button(
-                        onClick = { onSave(name, avatarUri?.toString()) },
+                        onClick = { onSave(name, avatarPath) },
                         enabled = name.isNotBlank(),
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(16.dp)

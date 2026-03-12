@@ -13,6 +13,7 @@ import com.example.langfire_app.domain.usecase.GetAllCoursesUseCase
 import com.example.langfire_app.domain.usecase.GetProfileStatsUseCase
 import com.example.langfire_app.domain.usecase.GetProfileUseCase
 import com.example.langfire_app.domain.usecase.UpdateProfileUseCase
+import com.example.langfire_app.domain.engine.FortuneWheelMechanic
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -79,6 +80,7 @@ class ProfileViewModel @Inject constructor(
             stats.totalCorrect.toFloat() / totalAnswers * 100f
         else 0f
 
+        val hasSuperWin = unlockedAchievements.any { it.type == FortuneWheelMechanic.UNIQUE_FORTUNE_ACHIEVEMENT_TYPE }
 
         _uiState.update {
             it.copy(
@@ -91,7 +93,8 @@ class ProfileViewModel @Inject constructor(
                 wordsLearned = stats.wordsLearned,
                 toughestWord = stats.toughestWord,
                 accuracyPercent = accuracy,
-                courseProgress = stats.courseProgress
+                courseProgress = stats.courseProgress,
+                hasSuperWin = hasSuperWin
             )
         }
     }
@@ -126,5 +129,6 @@ data class ProfileUiState(
     val wordsLearned: Int = 0,
     val toughestWord: String? = null,
     val accuracyPercent: Float = 0f,
-    val courseProgress: List<CourseLevelInfo> = emptyList()
+    val courseProgress: List<CourseLevelInfo> = emptyList(),
+    val hasSuperWin: Boolean = false
 )
