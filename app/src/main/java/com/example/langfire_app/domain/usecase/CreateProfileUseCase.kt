@@ -9,8 +9,8 @@ class CreateProfileUseCase @Inject constructor(
     private val profileRepository: ProfileRepository,
     private val settingsRepository: SettingsRepository
 ) {
-    suspend operator fun invoke(userName: String, initialCourseId: Int){
-        val newProfile = Profile(name = userName)
+    suspend operator fun invoke(userName: String, initialCourseId: Int, avatarPath: String? = null){
+        val newProfile = Profile(name = userName, avatarPath = avatarPath)
         profileRepository.saveProfile(newProfile)
         settingsRepository.setCurrentCourseId(initialCourseId)
     }

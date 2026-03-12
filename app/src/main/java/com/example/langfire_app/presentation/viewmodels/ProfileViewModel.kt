@@ -12,6 +12,7 @@ import com.example.langfire_app.domain.usecase.GetAchievementsUseCase
 import com.example.langfire_app.domain.usecase.GetAllCoursesUseCase
 import com.example.langfire_app.domain.usecase.GetProfileStatsUseCase
 import com.example.langfire_app.domain.usecase.GetProfileUseCase
+import com.example.langfire_app.domain.usecase.UpdateProfileUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,7 +27,8 @@ class ProfileViewModel @Inject constructor(
     private val getAllCoursesUseCase: GetAllCoursesUseCase,
     private val createProfileUseCase: CreateProfileUseCase,
     private val getAchievementsUseCase: GetAchievementsUseCase,
-    private val getProfileStatsUseCase: GetProfileStatsUseCase
+    private val getProfileStatsUseCase: GetProfileStatsUseCase,
+    private val updateProfileUseCase: UpdateProfileUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProfileUiState())
@@ -95,10 +97,19 @@ class ProfileViewModel @Inject constructor(
     }
 
 
-    fun onRegister(name: String, courseId: Int) {
+    fun onRegister(name: String, courseId: Int, avatarPath: String? = null) {
         viewModelScope.launch {
-            createProfileUseCase(name, courseId)
+            createProfileUseCase(name, courseId, avatarPath)
             checkProfile()
+        }
+    }
+
+    fun onUpdateProfile(name: String, avatarPath: String?) {
+        val currentProfile = _uiState.value.profile ?: return
+        viewModelScope.launch {
+            val updatedProfile = currentProfile.copy(name = name, avatarPath = avatarPath)
+            updateProfileUseCase(updatedProfile)
+            _uiState.update { it.copy(profile = updatedProfile) }
         }
     }
 }

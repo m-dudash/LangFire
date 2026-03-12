@@ -11,5 +11,6 @@ data class Profile(
     val streakDays: Int = 0,
     val lastActiveDate: Long = System.currentTimeMillis(),
     val xpMultiplier: Int = 1,
-    val xpMultiplierExpiresAt: Long? = null
+    val xpMultiplierExpiresAt: Long? = null,
+    val avatarPath: String? = null
 )

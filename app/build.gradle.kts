@@ -80,4 +80,7 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
+
+    // Image loading
+    implementation(libs.coil.compose)
 }

@@ -27,6 +27,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.langfire_app.domain.model.Achievement
@@ -72,7 +81,10 @@ fun ProfileScreen(
                     )
                 }
                 else -> {
-                    ProfileContent(uiState = uiState)
+                    ProfileContent(
+                        uiState = uiState,
+                        onUpdateProfile = viewModel::onUpdateProfile
+                    )
                 }
             }
         }
@@ -82,10 +94,16 @@ fun ProfileScreen(
 @Composable
 fun RegistrationForm(
     courses: List<Course>,
-    onRegister: (String, Int) -> Unit
+    onRegister: (String, Int, String?) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var selectedCourseId by remember { mutableStateOf<Int?>(null) }
+    var avatarUri by remember { mutableStateOf<Uri?>(null) }
+    
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri -> if(uri != null) avatarUri = uri }
+    )
 
     Box(
         modifier = Modifier
@@ -133,6 +151,37 @@ fun RegistrationForm(
 
             Spacer(modifier = Modifier.height(40.dp))
 
+            // Avatar Picker
+            Box(
+                modifier = Modifier
+                    .size(100.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable { 
+                        photoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        ) 
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (avatarUri != null) {
+                    AsyncImage(
+                        model = avatarUri,
+                        contentDescription = "Profile Picture",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Add Picture",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+
             // Name Input
             OutlinedTextField(
                 value = name,
@@ -177,7 +226,7 @@ fun RegistrationForm(
 
             // Action Button
             Button(
-                onClick = { selectedCourseId?.let { onRegister(name, it) } },
+                onClick = { selectedCourseId?.let { onRegister(name, it, avatarUri?.toString()) } },
                 enabled = name.isNotBlank() && selectedCourseId != null,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -253,7 +302,7 @@ fun CourseSelectionCard(
 // PROFILE CONTENT
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
-private fun ProfileContent(uiState: ProfileUiState) {
+private fun ProfileContent(uiState: ProfileUiState, onUpdateProfile: (String, String?) -> Unit) {
     val profile = uiState.profile ?: return
     LazyColumn(
         modifier = Modifier
@@ -262,7 +311,7 @@ private fun ProfileContent(uiState: ProfileUiState) {
             .statusBarsPadding(),
         contentPadding = PaddingValues(bottom = 48.dp)
     ) {
-        item { ProfileHeroSection(profile = profile) }
+        item { ProfileHeroSection(profile = profile, onUpdateProfile = onUpdateProfile) }
         item { Spacer(Modifier.height(20.dp)) }
         item { StatsSection(uiState = uiState) }
         item { Spacer(Modifier.height(20.dp)) }
@@ -278,7 +327,21 @@ private fun ProfileContent(uiState: ProfileUiState) {
 // HERO SECTION: Avatar + Name + Streak
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
-private fun ProfileHeroSection(profile: Profile) {
+private fun ProfileHeroSection(profile: Profile, onUpdateProfile: (String, String?) -> Unit) {
+    var showEditDialog by remember { mutableStateOf(false) }
+
+    if (showEditDialog) {
+        EditProfileDialog(
+            currentName = profile.name,
+            currentAvatar = profile.avatarPath,
+            onDismiss = { showEditDialog = false },
+            onSave = { name, avatar ->
+                onUpdateProfile(name, avatar)
+                showEditDialog = false
+            }
+        )
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -305,14 +368,6 @@ private fun ProfileHeroSection(profile: Profile) {
                 .padding(top = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Avatar circle with initials
-            val initials = profile.name
-                .trim()
-                .split(" ")
-                .take(2)
-                .joinToString("") { it.firstOrNull()?.uppercase() ?: "" }
-                .ifEmpty { "?" }
-
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
@@ -323,14 +378,47 @@ private fun ProfileHeroSection(profile: Profile) {
                             listOf(FireOrange, FireOrangeDeep)
                         )
                     )
+                    .clickable { showEditDialog = true }
             ) {
-                Text(
-                    text = initials,
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White
+                if (!profile.avatarPath.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = profile.avatarPath,
+                        contentDescription = "Profile Picture",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
                     )
-                )
+                } else {
+                    val initials = profile.name
+                        .trim()
+                        .split(" ")
+                        .take(2)
+                        .joinToString("") { it.firstOrNull()?.uppercase() ?: "" }
+                        .ifEmpty { "?" }
+                    Text(
+                        text = initials,
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White
+                        )
+                    )
+                }
+                
+                // Small edit icon outline/overlay
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surface)
+                        .padding(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit Profile",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
 
             Spacer(Modifier.height(12.dp))
@@ -981,4 +1069,102 @@ private fun profileLevelGradient(level: String): Brush = when (level.uppercase()
     "C1" -> Brush.verticalGradient(listOf(Color(0xFFAB47BC), Color(0xFF6A1B9A)))
     "C2" -> Brush.linearGradient(listOf(Color(0xFFFFD740), Color(0xFFFF6F00)))
     else -> Brush.verticalGradient(listOf(Color.Gray, Color.DarkGray))
+}
+
+@Composable
+fun EditProfileDialog(
+    currentName: String,
+    currentAvatar: String?,
+    onDismiss: () -> Unit,
+    onSave: (String, String?) -> Unit
+) {
+    var name by remember { mutableStateOf(currentName) }
+    var avatarUri by remember { mutableStateOf<Uri?>(if (currentAvatar != null) Uri.parse(currentAvatar) else null) }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri -> if(uri != null) avatarUri = uri }
+    )
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.fillMaxWidth().padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Edit Profile",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable {
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (avatarUri != null) {
+                        AsyncImage(
+                            model = avatarUri,
+                            contentDescription = "Profile Picture",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Change Picture",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Spacer(modifier = Modifier.height(32.dp))
+                
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Cancel")
+                    }
+                    Button(
+                        onClick = { onSave(name, avatarUri?.toString()) },
+                        enabled = name.isNotBlank(),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Text("Save")
+                    }
+                }
+            }
+        }
+    }
 }
