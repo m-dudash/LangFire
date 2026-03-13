@@ -216,8 +216,8 @@ class LearnViewModel @Inject constructor(
                 return@launch
             }
 
-            val words = learnRepository.getSessionWords(profile.id, courseId, limit = 15)
-            if (words.isEmpty()) {
+            val words = learnRepository.getSessionWords(profile.id, courseId, limit = 50)
+            if (words.size < 15) {
                 _uiState.update { it.copy(sessionPhase = SessionPhase.EMPTY) }
                 return@launch
             }
@@ -230,6 +230,9 @@ class LearnViewModel @Inject constructor(
             if (words.size >= 4) {
                 matchingCandidateGroup = words.take(4)
             }
+
+            // Pre-load distractors to avoid 50 database queries
+            val allDistractors = learnRepository.getDistractors(profile.id, courseId, excludedWordId = -1, limit = 200)
 
             for (word in words) {
                 // Determine exercise type. Based on repetition (how well they know it).
@@ -259,7 +262,7 @@ class LearnViewModel @Inject constructor(
                 // If it's a multiple choice, load distractors
                 var options = emptyList<SessionWordItem>()
                 if (type == ExerciseType.TRANSLATE_L1 || type == ExerciseType.TRANSLATE_L2 || type == ExerciseType.LISTENING_CHOOSE) {
-                    val distractors = learnRepository.getDistractors(profile.id, courseId, word.wordId, limit = 3)
+                    val distractors = allDistractors.filter { it.wordId != word.wordId }.shuffled().take(3)
                     options = (distractors + word).shuffled()
                     // Fallback to flashcard if not enough words in DB
                     if (options.size < 4) {

@@ -115,7 +115,7 @@ private fun SessionEmptyScreen() {
             Text("🎉", fontSize = 96.sp)
             Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = "All Caught Up!",
+                text = "Not Enough Words!",
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Black,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -123,7 +123,7 @@ private fun SessionEmptyScreen() {
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "You've reviewed all due words. Go to the Library to add more words to your learning queue.",
+                text = "You need at least 15 words to start a session. Go to the Library to add more words to your learning queue.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -1057,12 +1057,25 @@ private fun SessionFinishedScreen(
             Spacer(modifier = Modifier.height(24.dp))
             if (xp > 0 || achievements.isNotEmpty()) {
                 if (xp > 0) {
-                    Text(
-                        "+$xp XP",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Black,
-                        color = Color(0xFFFFD54F) // Gold color
-                    )
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color(0xFFFFD54F).copy(alpha = 0.2f),
+                        border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFFFD54F))
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text("⚡", fontSize = 24.sp)
+                            Text(
+                                text = "+$xp XP",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFFFFD54F)
+                            )
+                        }
+                    }
                 }
                 if (achievements.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(16.dp))
