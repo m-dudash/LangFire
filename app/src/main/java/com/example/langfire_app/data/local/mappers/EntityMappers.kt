@@ -26,7 +26,8 @@ object EntityMappers {
         xpMultiplier = xpMultiplier,
         xpMultiplierExpiresAt = xpMultiplierExpiresAt,
         avatarPath = avatarPath,
-        streakFreezes = streakFreezes
+        streakFreezes = streakFreezes,
+        dailyWordGoal = dailyWordGoal
     )
 
     fun Profile.toEntity(): ProfileEntity = ProfileEntity(
@@ -38,7 +39,8 @@ object EntityMappers {
         xpMultiplier = xpMultiplier,
         xpMultiplierExpiresAt = xpMultiplierExpiresAt,
         avatarPath = avatarPath,
-        streakFreezes = streakFreezes
+        streakFreezes = streakFreezes,
+        dailyWordGoal = dailyWordGoal
     )
 
     // ──────────────────────────────────────────────

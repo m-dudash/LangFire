@@ -19,5 +19,9 @@ data class EngineResult(
     val streakUpdated: Boolean = false,
     val newStreakDays: Int = 0,
     val fortuneReward: FortuneReward? = null,
-    val freezeGranted: Boolean = false
+    val freezeGranted: Boolean = false,
+    /** Number of correct answers the user has given today (across all sessions). */
+    val correctToday: Int = 0,
+    /** The user's configured daily goal (correct answers required to keep the streak). */
+    val dailyGoal: Int = 0
 )

@@ -2,6 +2,7 @@ package com.example.langfire_app.presentation.screens
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -28,6 +29,8 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -298,6 +301,13 @@ private fun SessionStudyScreen(
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        StreakProgressRing(
+            correctToday = state.correctToday,
+            dailyGoal = state.dailyGoal
+        )
 
         Spacer(modifier = Modifier.height(32.dp))
 
@@ -795,6 +805,70 @@ private fun MatchingExercise(state: LearnUiState, viewModel: LearnViewModel, exe
     }
 }
 
+
+@Composable
+private fun StreakProgressRing(
+    correctToday: Int,
+    dailyGoal: Int
+) {
+    val progress = if (dailyGoal > 0) (correctToday.toFloat() / dailyGoal).coerceIn(0f, 1f) else 0f
+    val isGoalMet = correctToday >= dailyGoal && dailyGoal > 0
+    
+    // Pulse/Scale animation for the fire emoji based on progress
+    val fireScale by animateFloatAsState(
+        targetValue = 1f + (progress * 0.4f), 
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "fireScale"
+    )
+
+    Box(
+        modifier = Modifier.size(70.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        // Ring
+        val animatedProgress by animateFloatAsState(
+            targetValue = progress,
+            animationSpec = spring(stiffness = Spring.StiffnessLow),
+            label = "ringProgress"
+        )
+
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val strokeWidth = 6.dp.toPx()
+            
+            // Background track
+            drawCircle(
+                color = Color.LightGray.copy(alpha = 0.3f),
+                style = Stroke(width = strokeWidth)
+            )
+
+            // Progress Arc
+            if (isGoalMet) {
+                drawArc(
+                    brush = Brush.sweepGradient(listOf(FireOrange, FireOrangeDeep, FireOrange)),
+                    startAngle = -90f,
+                    sweepAngle = 360f * animatedProgress,
+                    useCenter = false,
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                )
+            } else {
+                drawArc(
+                    color = Color.Gray.copy(alpha = 0.6f),
+                    startAngle = -90f,
+                    sweepAngle = 360f * animatedProgress,
+                    useCenter = false,
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                )
+            }
+        }
+
+        // The Flame (Centered)
+        Text(
+            text = "🔥",
+            fontSize = 30.sp,
+            modifier = Modifier.graphicsLayer(scaleX = fireScale, scaleY = fireScale)
+        )
+    }
+}
 
 // ─── Beautiful FlipCard ───────────────────────────────────────────────────────
 

@@ -35,7 +35,8 @@ object SessionBehaviorBuilder {
                 "forgot_count"     to forgotCount.toString(),
                 "total_exercises"  to totalExercises.toString(),
                 "accuracy"         to accuracy.toString(),
-                "session_time"     to sessionDurationSec.toString()
+                "session_time"     to sessionDurationSec.toString(),
+                "cumulative_already_tracked" to "true"
             )
         )
     }

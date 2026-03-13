@@ -10,6 +10,7 @@ import com.example.langfire_app.domain.srs.SrsEngine
 import com.example.langfire_app.domain.repository.LearnRepository
 import com.example.langfire_app.domain.repository.ProfileRepository
 import com.example.langfire_app.domain.repository.SettingsRepository
+import com.example.langfire_app.domain.usecase.GetProfileStatsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -63,7 +64,11 @@ data class LearnUiState(
     val forgotCount: Int = 0,
 
     // gamification result (populated when session finishes)
-    val engineResult: EngineResult? = null
+    val engineResult: EngineResult? = null,
+    /** Cumulative correct answers today (pre-session + this session). */
+    val correctToday: Int = 0,
+    /** The user's streak goal for today. */
+    val dailyGoal: Int = 0
 ) {
     val currentExercise: ExerciseItem? get() = queue.getOrNull(currentIndex)
     val progress: Float get() = if (totalInSession == 0) 0f else (currentIndex + 1).toFloat() / totalInSession
@@ -76,7 +81,8 @@ class LearnViewModel @Inject constructor(
     private val learnRepository: LearnRepository,
     private val profileRepository: ProfileRepository,
     private val settingsRepository: SettingsRepository,
-    private val gamificationEngine: GamificationEngine
+    private val gamificationEngine: GamificationEngine,
+    private val getProfileStatsUseCase: GetProfileStatsUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LearnUiState())
@@ -113,7 +119,7 @@ class LearnViewModel @Inject constructor(
         _uiState.update { it.copy(cardPhase = CardPhase.REVEALED, selectedWordId = selectedWordId) }
         
         viewModelScope.launch {
-            kotlinx.coroutines.delay(3000)
+            kotlinx.coroutines.delay(2000) // Reduced from 3s to 2s for snappier feel
             if (_uiState.value.cardPhase == CardPhase.REVEALED && _uiState.value.selectedWordId == selectedWordId) {
                 answer(quality)
             }
@@ -161,11 +167,22 @@ class LearnViewModel @Inject constructor(
             val nextIndex = state.currentIndex + 1
             val isFinished = nextIndex >= state.queue.size
 
-            // Calculate final counts BEFORE updating state
-            val finalCorrect = state.correctCount + if (wasCorrect) 1 else 0
+            // Calculate final counts
+            val newlyCorrect = if (wasCorrect) 1 else 0
+            val totalCorrectToday = state.correctToday + newlyCorrect
+            val finalCorrect = state.correctCount + newlyCorrect
             val finalForgot  = state.forgotCount  + if (!wasCorrect) 1 else 0
+            // 1. Record individual correct answer (important for real-time streak/ring growth)
+            if (wasCorrect) {
+                gamificationEngine.processBehavior(
+                    com.example.langfire_app.domain.model.Behavior(
+                        type = "correct_answer",
+                        profileId = profile.id
+                    )
+                )
+            }
 
-            // If session is finished, process gamification
+            // 2. If session is finished, process session-level gamification (achievements, XP)
             var engineResult: EngineResult? = null
             if (isFinished) {
                 val elapsedSec = (System.currentTimeMillis() - sessionStartedAt) / 1000
@@ -177,6 +194,8 @@ class LearnViewModel @Inject constructor(
                     sessionDurationSec = elapsedSec
                 )
                 engineResult = gamificationEngine.processBehavior(behavior)
+                
+                kotlinx.coroutines.delay(2000) // Final question visibility delay before summary
             }
 
             _uiState.update {
@@ -186,10 +205,11 @@ class LearnViewModel @Inject constructor(
                     typedText = "",
                     isTypeCorrect = null,
                     selectedWordId = null,
-                    correctCount = finalCorrect,
-                    forgotCount = finalForgot,
                     sessionPhase = if (isFinished) SessionPhase.FINISHED else SessionPhase.STUDYING,
-                    engineResult = engineResult
+                    engineResult = engineResult,
+                    correctToday = totalCorrectToday,
+                    correctCount = finalCorrect,
+                    forgotCount = finalForgot
                 )
             }
         }
@@ -283,7 +303,9 @@ class LearnViewModel @Inject constructor(
                     totalInSession = mixedExercises.size,
                     correctCount   = 0,
                     forgotCount    = 0,
-                    engineResult   = null
+                    engineResult   = null,
+                    correctToday   = getProfileStatsUseCase(profile.id).correctToday,
+                    dailyGoal      = profile.dailyWordGoal
                 )
             }
         }

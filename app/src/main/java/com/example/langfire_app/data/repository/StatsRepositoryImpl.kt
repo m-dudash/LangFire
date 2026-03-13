@@ -7,7 +7,9 @@ import com.example.langfire_app.domain.util.CourseProgressCalculator
 import com.example.langfire_app.domain.model.CourseLevelInfo
 import com.example.langfire_app.domain.model.HomeCourseStats
 import com.example.langfire_app.domain.model.ProfileStats
+import com.example.langfire_app.domain.repository.BehaviorRepository
 import com.example.langfire_app.domain.repository.StatsRepository
+import java.util.Calendar
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -15,7 +17,8 @@ import javax.inject.Singleton
 @Singleton
 class StatsRepositoryImpl @Inject constructor(
     private val wordProgressDao: WordProgressDao,
-    private val courseDao: CourseDao
+    private val courseDao: CourseDao,
+    private val behaviorRepository: BehaviorRepository
 ) : StatsRepository {
 
     override suspend fun getProfileStats(profileId: Int): ProfileStats {
@@ -26,6 +29,27 @@ class StatsRepositoryImpl @Inject constructor(
         val totalCorrect = wordProgressDao.getTotalCorrectCount(profileId) ?: 0
         val totalErrors  = wordProgressDao.getTotalIncorrectCount(profileId) ?: 0
         val toughestWord = wordProgressDao.getToughestWordText(profileId)
+
+        // Count correct answers today from behaviors
+        val cal = Calendar.getInstance()
+        cal.set(Calendar.HOUR_OF_DAY, 0)
+        cal.set(Calendar.MINUTE, 0)
+        cal.set(Calendar.SECOND, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        val todayStartMs = cal.timeInMillis
+
+        val scCount = behaviorRepository.getBehaviorsByTypeAfter(
+            profileId, "session_complete", todayStartMs
+        ).sumOf { b -> 
+            if (b.attributes["cumulative_already_tracked"] == "true") 0
+            else b.attributes["correct_count"]?.toIntOrNull() ?: 0 
+        }
+
+        val caCount = behaviorRepository.getBehaviorsByTypeAfter(
+            profileId, "correct_answer", todayStartMs
+        ).size
+
+        val correctToday = scCount + caCount
 
 
         // ── CEFR progression for all courses ───────────────────────────
@@ -54,6 +78,7 @@ class StatsRepositoryImpl @Inject constructor(
             wordsLearned   = wordsLearned,
             totalCorrect   = totalCorrect,
             totalErrors    = totalErrors,
+            correctToday   = correctToday,
             toughestWord   = toughestWord,
             courseProgress = courseProgress
         )

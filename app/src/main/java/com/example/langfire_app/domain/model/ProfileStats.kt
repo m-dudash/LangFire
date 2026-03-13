@@ -4,6 +4,7 @@ data class ProfileStats(
     val wordsLearned: Int = 0,
     val totalCorrect: Int = 0,
     val totalErrors: Int = 0,
+    val correctToday: Int = 0,
     val toughestWord: String? = null,
     val courseProgress: List<CourseLevelInfo> = emptyList()
 )

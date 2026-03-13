@@ -58,6 +58,7 @@ import com.example.langfire_app.domain.model.Achievement
 import com.example.langfire_app.domain.model.Course
 import com.example.langfire_app.domain.model.CourseLevelInfo
 import com.example.langfire_app.domain.model.Profile
+import androidx.compose.ui.window.Dialog
 import com.example.langfire_app.presentation.ui.theme.*
 import com.example.langfire_app.presentation.viewmodels.ProfileUiState
 import com.example.langfire_app.presentation.viewmodels.ProfileViewModel
@@ -101,242 +102,28 @@ fun ProfileScreen(
         }
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            when {
-                uiState.isLoading -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-                !uiState.hasProfile -> {
-                    RegistrationForm(
-                        courses = uiState.availableCourses,
-                        onRegister = viewModel::onRegister
-                    )
-                }
-                else -> {
-                    ProfileContent(
-                        uiState = uiState,
-                        onUpdateProfile = viewModel::onUpdateProfile
-                    )
-                }
-            }
+            ProfileContent(
+                uiState = uiState,
+                onUpdateProfile = viewModel::onUpdateProfile,
+                onUpdateGoal = viewModel::updateDailyGoal
+            )
         }
     }
 }
 
-@Composable
-fun RegistrationForm(
-    courses: List<Course>,
-    onRegister: (String, Int, String?) -> Unit
-) {
-    var name by remember { mutableStateOf("") }
-    var selectedCourseId by remember { mutableStateOf<Int?>(null) }
-    var avatarUri by remember { mutableStateOf<Uri?>(null) }
-    
-    val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia(),
-        onResult = { uri -> if(uri != null) avatarUri = uri }
-    )
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        // Subtle top gradient
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(200.dp)
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            FireOrange.copy(alpha = 0.2f),
-                            Color.Transparent
-                        )
-                    )
-                )
-        )
+// ─── PROFILE CONTENT ─────────────────────────────────────────────────────────
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp)
-                .statusBarsPadding(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            // Header
-            Text("🔥", fontSize = 64.sp)
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Welcome to LangFire",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = FireOrange
-                )
-            )
-            Text(
-                text = "Ignite your language learning journey",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(40.dp))
-
-            // Avatar Picker
-            Box(
-                modifier = Modifier
-                    .size(100.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable { 
-                        photoPickerLauncher.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                        ) 
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                if (avatarUri != null) {
-                    AsyncImage(
-                        model = avatarUri,
-                        contentDescription = "Profile Picture",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Add Picture",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Name Input
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("What should we call you?") },
-                singleLine = true,
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = FireOrange,
-                    focusedLabelColor = FireOrange,
-                    cursorColor = FireOrange
-                )
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Course Selection
-            Text(
-                text = "Choose your path:",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.align(Alignment.Start)
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)
-            ) {
-                items(courses) { course ->
-                    CourseSelectionCard(
-                        course = course,
-                        isSelected = selectedCourseId == course.id,
-                        onClick = { selectedCourseId = course.id }
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            // Action Button
-            Button(
-                onClick = { selectedCourseId?.let { onRegister(name, it, avatarUri?.toString()) } },
-                enabled = name.isNotBlank() && selectedCourseId != null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = FireOrange,
-                    disabledContainerColor = Color.Gray.copy(alpha = 0.3f)
-                )
-            ) {
-                Text(
-                    text = "Start Learning",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = Color.White
-                )
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-    }
-}
-
-@Composable
-fun CourseSelectionCard(
-    course: Course,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    val borderColor = if (isSelected) FireOrange else Color.Transparent
-    val backgroundColor = if (isSelected) FireOrange.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant
-
-    Card(
-        onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = backgroundColor),
-        border = if (isSelected) androidx.compose.foundation.BorderStroke(2.dp, borderColor) else null,
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(1f) // Square cards
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = course.icon,
-                fontSize = 40.sp
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = course.name,
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                maxLines = 2,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-            )
-            if (isSelected) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = "Selected",
-                    tint = FireOrange,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-    }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PROFILE CONTENT
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
-private fun ProfileContent(uiState: ProfileUiState, onUpdateProfile: (String, String?) -> Unit) {
+private fun ProfileContent(
+    uiState: ProfileUiState, 
+    onUpdateProfile: (String, String?) -> Unit,
+    onUpdateGoal: (Int) -> Unit
+) {
     val profile = uiState.profile ?: return
     LazyColumn(
         modifier = Modifier
@@ -345,7 +132,14 @@ private fun ProfileContent(uiState: ProfileUiState, onUpdateProfile: (String, St
             .statusBarsPadding(),
         contentPadding = PaddingValues(bottom = 48.dp)
     ) {
-        item { ProfileHeroSection(profile = profile, uiState = uiState, onUpdateProfile = onUpdateProfile) }
+        item { 
+            ProfileHeroSection(
+                profile = profile, 
+                uiState = uiState, 
+                onUpdateProfile = onUpdateProfile,
+                onUpdateGoal = onUpdateGoal
+            ) 
+        }
         item { Spacer(Modifier.height(20.dp)) }
         item { StatsSection(uiState = uiState) }
         item { Spacer(Modifier.height(20.dp)) }
@@ -361,8 +155,15 @@ private fun ProfileContent(uiState: ProfileUiState, onUpdateProfile: (String, St
 // HERO SECTION: Avatar + Name + Streak
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
-private fun ProfileHeroSection(profile: Profile, uiState: ProfileUiState, onUpdateProfile: (String, String?) -> Unit) {
+private fun ProfileHeroSection(
+    profile: Profile, 
+    uiState: ProfileUiState, 
+    onUpdateProfile: (String, String?) -> Unit,
+    onUpdateGoal: (Int) -> Unit
+) {
     var showEditDialog by remember { mutableStateOf(false) }
+    var showGoalDialog by remember { mutableStateOf(false) }
+
 
     val interactionSource = remember { MutableInteractionSource() }
     val isSuperWinActive = uiState.hasSuperWin || interactionSource.collectIsPressedAsState().value
@@ -374,6 +175,17 @@ private fun ProfileHeroSection(profile: Profile, uiState: ProfileUiState, onUpda
         animationSpec = infiniteRepeatable(tween(3000, easing = LinearEasing)),
         label = "rotation"
     )
+
+    if (showGoalDialog) {
+        GoalSelectionDialog(
+            currentGoal = uiState.dailyWordGoal,
+            onDismiss = { showGoalDialog = false },
+            onSelect = { goal ->
+                onUpdateGoal(goal)
+                showGoalDialog = false
+            }
+        )
+    }
 
     if (showEditDialog) {
         EditProfileDialog(
@@ -560,7 +372,14 @@ private fun ProfileHeroSection(profile: Profile, uiState: ProfileUiState, onUpda
                 }
                 
                 Spacer(Modifier.height(8.dp))
-                ProfileStreakBadge(streakDays = profile.streakDays)
+                
+                Spacer(Modifier.height(12.dp))
+                StreakProgressBar(
+                    streakDays = profile.streakDays,
+                    correctToday = uiState.correctToday,
+                    dailyGoal = uiState.dailyWordGoal,
+                    onGoalClick = { showGoalDialog = true }
+                )
             }
         }
     }
@@ -696,27 +515,170 @@ private fun FreezeCounter(count: Int, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun ProfileStreakBadge(streakDays: Int) {
-    val isAlive = streakDays > 0
-    val accentColor = if (isAlive) Color(0xFFFF6D00) else Color(0xFF9E9E9E)
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = accentColor.copy(alpha = 0.12f),
-        border = BorderStroke(1.5.dp, accentColor.copy(alpha = 0.45f))
+private fun StreakProgressBar(
+    streakDays: Int,
+    correctToday: Int,
+    dailyGoal: Int,
+    onGoalClick: () -> Unit
+) {
+    val progress = if (dailyGoal > 0) (correctToday.toFloat() / dailyGoal).coerceIn(0f, 1f) else 0f
+    val isGoalMet = correctToday >= dailyGoal && dailyGoal > 0
+    val accentColor = if (streakDays > 0) FireOrange else Color.Gray
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(text = if (isAlive) "🔥" else "💤", fontSize = 14.sp)
+            // Flame + Count
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = if (streakDays > 0) "🔥" else "💤", fontSize = 20.sp)
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "$streakDays",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Black,
+                        color = if (streakDays > 0) FireOrangeDeep else Color.Gray
+                    )
+                )
+            }
+
+            // Progress Text
             Text(
-                text = "$streakDays",
-                style = MaterialTheme.typography.labelLarge.copy(
-                    fontWeight = FontWeight.ExtraBold,
-                    color = accentColor
+                text = "$correctToday / $dailyGoal correct",
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = if (isGoalMet) EmeraldGreen else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             )
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Horizontal Progress Bar
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(12.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable { onGoalClick() }
+        ) {
+            val progressWidth by animateFloatAsState(
+                targetValue = progress,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+                label = "streakProgress"
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(progressWidth)
+                    .fillMaxHeight()
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            if (isGoalMet) listOf(EmeraldGreen, Color(0xFF81C784))
+                            else listOf(FireOrange, FireOrangeDeep)
+                        )
+                    )
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Center "Edit goal" label
+        Text(
+            text = "Edit goal",
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.Bold,
+                color = FireOrangeDeep.copy(alpha = 0.7f)
+            ),
+            modifier = Modifier
+                .clickable { onGoalClick() }
+                .padding(horizontal = 12.dp, vertical = 4.dp)
+        )
+    }
+}
+
+@Composable
+private fun GoalSelectionDialog(
+    currentGoal: Int,
+    onDismiss: () -> Unit,
+    onSelect: (Int) -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            modifier = Modifier.fillMaxWidth().padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Daily Goal",
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black)
+                )
+                Text(
+                    text = "Correct answers needed to keep your streak alive",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                Profile.GOAL_TIERS.forEach { goal ->
+                    val isSelected = goal == currentGoal
+                    val label = when (goal) {
+                        Profile.GOAL_BEGINNER -> "🌱 Beginner"
+                        Profile.GOAL_MODERATE -> "📈 Progressor"
+                        Profile.GOAL_INTENSIVE -> "🔥 Intensive"
+                        Profile.GOAL_BURN -> "💀 BURN IT!"
+                        else -> "$goal Words"
+                    }
+
+                    Surface(
+                        onClick = { onSelect(goal) },
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        color = if (isSelected) FireOrange.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant,
+                        border = if (isSelected) BorderStroke(2.dp, FireOrange) else null
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Bold,
+                                    color = if (isSelected) FireOrangeDeep else MaterialTheme.colorScheme.onSurface
+                                )
+                            )
+                            Text(
+                                text = "$goal",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+                                color = if (isSelected) FireOrangeDeep else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                TextButton(onClick = onDismiss) {
+                    Text("Close", fontWeight = FontWeight.Bold, color = FireOrangeDeep)
+                }
+            }
         }
     }
 }

@@ -23,36 +23,6 @@ class DatabaseCallback @Inject constructor(
     }
 
     private suspend fun populateDatabase() {
-        val appDatabase = database.get()
-
-        val profileDao = appDatabase.profileDao()
-        val courseDao = appDatabase.courseDao()
-
-        // Seed Courses (Dutch from English, Slovak from Russian)
-        val dutchCourse = com.example.langfire_app.data.local.entities.CourseEntity(
-            name = "Dutch (from English)",
-            targetLang = "nl",
-            targetLanguageId = 1,
-            icon = "🇳🇱"
-        )
-        val slovakCourse = com.example.langfire_app.data.local.entities.CourseEntity(
-            name = "Slovak (from Russian)",
-            targetLang = "sk",
-            targetLanguageId = 2,
-            icon = "🇸🇰"
-        )
-        courseDao.insert(dutchCourse)
-        courseDao.insert(slovakCourse)
-
-        val profileId = profileDao.insert(
-            ProfileEntity(
-                name = "Student",
-                xp = 0,
-                streakDays = 0,
-                lastActiveDate = System.currentTimeMillis()
-            )
-        )
-        
-        gamificationSeeder.get().seedIfNeeded(profileId.toInt())
+        // NIC (uz nie je potrebny)
     }
 }

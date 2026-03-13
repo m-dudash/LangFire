@@ -95,15 +95,26 @@ class ProfileViewModel @Inject constructor(
                 accuracyPercent = accuracy,
                 courseProgress = stats.courseProgress,
                 hasSuperWin = hasSuperWin,
-                streakFreezes = profile.streakFreezes
+                streakFreezes = profile.streakFreezes,
+                correctToday = stats.correctToday,
+                dailyWordGoal = profile.dailyWordGoal
             )
         }
     }
 
-
-    fun onRegister(name: String, courseId: Int, avatarPath: String? = null) {
+    fun updateDailyGoal(newGoal: Int) {
+        val currentProfile = _uiState.value.profile ?: return
         viewModelScope.launch {
-            createProfileUseCase(name, courseId, avatarPath)
+            val updatedProfile = currentProfile.copy(dailyWordGoal = newGoal)
+            updateProfileUseCase(updatedProfile)
+            _uiState.update { it.copy(profile = updatedProfile, dailyWordGoal = newGoal) }
+        }
+    }
+
+
+    fun onRegister(name: String, courseId: Int, dailyGoal: Int, avatarPath: String? = null) {
+        viewModelScope.launch {
+            createProfileUseCase(name, courseId, dailyGoal, avatarPath)
             checkProfile()
         }
     }
@@ -132,5 +143,7 @@ data class ProfileUiState(
     val accuracyPercent: Float = 0f,
     val courseProgress: List<CourseLevelInfo> = emptyList(),
     val hasSuperWin: Boolean = false,
-    val streakFreezes: Int = 0
+    val streakFreezes: Int = 0,
+    val correctToday: Int = 0,
+    val dailyWordGoal: Int = 0
 )

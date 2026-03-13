@@ -108,12 +108,29 @@ class GamificationEngine @Inject constructor(
         // Step 7: Check & update streak
         val streakResult = updateStreakIfNeeded(savedBehavior)
 
+        // Step 8: Compute daily goal progress for the UI
+        val profile = profileRepository.getProfileById(savedBehavior.profileId)
+        val todayStartMs = startOfDayMs(savedBehavior.timestamp)
+        val todayBehaviors = behaviorRepository.getBehaviorsByTypeAfter(
+            savedBehavior.profileId, "session_complete", todayStartMs
+        )
+        val correctFromSessions = todayBehaviors.sumOf { b ->
+            if (b.attributes["cumulative_already_tracked"] == "true") 0
+            else b.attributes["correct_count"]?.toIntOrNull() ?: 0
+        }
+        val correctIndividual = behaviorRepository.getBehaviorsByTypeAfter(
+            savedBehavior.profileId, "correct_answer", todayStartMs
+        ).size
+        val correctToday = correctFromSessions + correctIndividual
+
         return EngineResult(
             xpGranted = totalXpGranted,
             newAchievements = newAchievements,
             updatedAchievements = updatedAchievements,
             streakUpdated = streakResult.first,
-            newStreakDays = streakResult.second
+            newStreakDays = streakResult.second,
+            correctToday = correctToday,
+            dailyGoal = profile?.dailyWordGoal ?: Profile.DEFAULT_DAILY_GOAL
         )
     }
 
@@ -183,8 +200,10 @@ class GamificationEngine @Inject constructor(
     /**
      * Update the user's daily streak if applicable.
      *
-     * Logic:
-     * - Calculates current streak from behavior history.
+     * Goal-based streak logic:
+     * - Sums up all correct answers from today's session_complete behaviors.
+     * - If the total correct answers today >= the user's dailyWordGoal,
+     *   the streak is eligible to advance.
      * - If a day was MISSED and the user has streak freezes, one freeze is consumed
      *   and the streak is maintained (not reset).
      * - Awards a freeze every 10 streak days (if the user has < MAX_FREEZES).
@@ -192,11 +211,32 @@ class GamificationEngine @Inject constructor(
      * @return Pair(streakUpdated, newStreakDays)
      */
     private suspend fun updateStreakIfNeeded(behavior: Behavior): Pair<Boolean, Int> {
-        val streakBehaviorTypes = setOf("session_complete", "app_open", "daily_activity")
+        val streakBehaviorTypes = setOf("session_complete", "app_open", "daily_activity", "correct_answer")
         if (behavior.type !in streakBehaviorTypes) return Pair(false, 0)
 
         val profile = profileRepository.getProfileById(behavior.profileId) ?: return Pair(false, 0)
 
+        // ── Goal check: count today's correct answers ────────────────────────
+        val todayStartMs = startOfDayMs(behavior.timestamp)
+        val scCount = behaviorRepository.getBehaviorsByTypeAfter(
+            behavior.profileId, "session_complete", todayStartMs
+        ).sumOf { b -> 
+            if (b.attributes["cumulative_already_tracked"] == "true") 0
+            else b.attributes["correct_count"]?.toIntOrNull() ?: 0 
+        }
+        
+        val caCount = behaviorRepository.getBehaviorsByTypeAfter(
+            behavior.profileId, "correct_answer", todayStartMs
+        ).size
+        
+        val correctToday = scCount + caCount
+
+        // If the daily goal hasn't been met yet, don't touch the streak
+        if (correctToday < profile.dailyWordGoal) {
+            return Pair(false, profile.streakDays)
+        }
+
+        // ── Streak calculation (goal met!) ───────────────────────────────────
         val allBehaviors = behaviorRepository.getBehaviorsByProfile(behavior.profileId)
         val streakBehaviors = allBehaviors.filter { it.type in streakBehaviorTypes }
 
@@ -235,6 +275,20 @@ class GamificationEngine @Inject constructor(
         }
 
         return Pair(false, profile.streakDays)
+    }
+
+    /**
+     * Returns the epoch-ms timestamp for the start of the day (midnight, local timezone)
+     * that contains [timestampMs]. Uses java.util.Calendar (no Android dependency).
+     */
+    private fun startOfDayMs(timestampMs: Long): Long {
+        val cal = java.util.Calendar.getInstance()
+        cal.timeInMillis = timestampMs
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        cal.set(java.util.Calendar.MINUTE, 0)
+        cal.set(java.util.Calendar.SECOND, 0)
+        cal.set(java.util.Calendar.MILLISECOND, 0)
+        return cal.timeInMillis
     }
 
     /**
