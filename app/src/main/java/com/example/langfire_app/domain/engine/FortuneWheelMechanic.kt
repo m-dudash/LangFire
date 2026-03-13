@@ -23,6 +23,23 @@ class FortuneWheelMechanic @Inject constructor(
     private val profileRepository: ProfileRepository
 ) {
 
+    suspend fun getAvailableRewards(profileId: Int): List<FortuneReward> {
+        val hasUnique = achievementRepository
+            .getAchievementsByType(profileId, UNIQUE_FORTUNE_ACHIEVEMENT_TYPE)
+            .isNotEmpty()
+
+        val baseRewards = listOf(
+            FortuneReward.Multiplier(2),
+            FortuneReward.Multiplier(3),
+            FortuneReward.Multiplier(5),
+            FortuneReward.Xp(200),
+            FortuneReward.Xp(300),
+            FortuneReward.Xp(500)
+        )
+
+        return if (hasUnique) baseRewards else baseRewards + FortuneReward.UniqueAchievement
+    }
+
     /**
      * Execute a fortune-wheel spin for the given profile.
      *

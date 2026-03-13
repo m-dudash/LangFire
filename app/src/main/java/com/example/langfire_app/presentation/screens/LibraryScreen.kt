@@ -521,10 +521,13 @@ fun UnitCard(
                 }
 
                 // Middle: unit name
+                var titleFontSize by remember { mutableStateOf(14.sp) }
                 Text(
                     text = unit.name,
                     style = MaterialTheme.typography.titleSmall.copy(
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        fontSize = titleFontSize,
+                        lineHeight = titleFontSize * 1.2f
                     ),
                     color = if (isLocked)
                         MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
@@ -532,7 +535,12 @@ fun UnitCard(
                         MaterialTheme.colorScheme.onSurface,
                     maxLines = 2,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
+                    modifier = Modifier.weight(1f, fill = false),
+                    onTextLayout = { textLayoutResult ->
+                        if (textLayoutResult.hasVisualOverflow && titleFontSize > 10.sp) {
+                            titleFontSize *= 0.9f
+                        }
+                    }
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))

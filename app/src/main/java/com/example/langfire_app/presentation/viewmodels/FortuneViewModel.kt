@@ -12,16 +12,21 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.example.langfire_app.domain.usecase.GetFortuneRewardsUseCase
 
 @HiltViewModel
 class FortuneViewModel @Inject constructor(
     private val getProfileUseCase: GetProfileUseCase,
     private val processBehaviorUseCase: ProcessBehaviorUseCase,
-    private val behaviorRepository: com.example.langfire_app.domain.repository.BehaviorRepository
+    private val behaviorRepository: com.example.langfire_app.domain.repository.BehaviorRepository,
+    private val getFortuneRewardsUseCase: GetFortuneRewardsUseCase
 ) : ViewModel() {
 
     private val _isAlreadySpun = MutableStateFlow(false)
     val isAlreadySpun: StateFlow<Boolean> = _isAlreadySpun.asStateFlow()
+
+    private val _availableRewards = MutableStateFlow<List<FortuneReward>>(emptyList())
+    val availableRewards: StateFlow<List<FortuneReward>> = _availableRewards.asStateFlow()
 
     init {
         checkAvailability()
@@ -36,6 +41,8 @@ class FortuneViewModel @Inject constructor(
             if (spins.isNotEmpty()) {
                 _isAlreadySpun.value = true
             }
+
+            _availableRewards.value = getFortuneRewardsUseCase(profile.id)
         }
     }
 

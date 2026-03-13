@@ -248,6 +248,13 @@ class GamificationEngine @Inject constructor(
         }
     }
 
+    /**
+     * Get available rewards for the fortune wheel.
+     */
+    suspend fun getFortuneRewards(profileId: Int): List<FortuneReward> {
+        return fortuneWheelMechanic.getAvailableRewards(profileId)
+    }
+
     // ── Internal helpers ─────────────────────────────────────────────────────
 
     /**

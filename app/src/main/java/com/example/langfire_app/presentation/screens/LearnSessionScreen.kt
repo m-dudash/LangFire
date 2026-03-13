@@ -1092,7 +1092,7 @@ private fun SessionFinishedScreen(
                     .shadow(16.dp, CircleShape, spotColor = Color.White.copy(alpha = 0.5f))
             ) {
                 Text(
-                    "ДАЛЕЕ",
+                    "NEXT",
                     color      = FireOrangeDeep,
                     fontWeight = FontWeight.Black,
                     fontSize   = 18.sp,

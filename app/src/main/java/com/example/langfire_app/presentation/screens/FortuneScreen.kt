@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -58,32 +59,29 @@ fun FortuneScreen(
     val rotation = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
 
-    val segments = remember {
-        val rewards = listOf(
-            FortuneReward.Multiplier(2),
-            FortuneReward.Multiplier(3),
-            FortuneReward.Multiplier(5),
-            FortuneReward.Xp(200),
-            FortuneReward.Xp(300),
-            FortuneReward.Xp(500),
-            FortuneReward.UniqueAchievement
-        )
+    val availableRewards by viewModel.availableRewards.collectAsState()
 
-        val fills = listOf(
-            SegmentFill.Solid(Color(0xFFFF2400)),
-            SegmentFill.Solid(Color(0xFFFFA500)),
-            SegmentFill.Solid(Color(0xFFFFFFFF)),
-            SegmentFill.Solid(Color(0xFFFF2400)),
-            SegmentFill.Solid(Color(0xFFFFA500)),
-            SegmentFill.Solid(Color(0xFFFFFFFF)),
-            SegmentFill.Gradient(Brush.linearGradient(listOf(Color(0xFFFF00BF), Color(0xFF5219D0))))
-        )
+    val segments = remember(availableRewards) {
+        if (availableRewards.isEmpty()) {
+            return@remember emptyList()
+        }
 
-        rewards.mapIndexed { index, reward ->
+        availableRewards.mapIndexed { index, reward ->
+            val fill = when(reward) {
+                FortuneReward.UniqueAchievement -> SegmentFill.Gradient(Brush.linearGradient(listOf(Color(0xFFFF00BF), Color(0xFF5219D0))))
+                else -> {
+                    // Regular pattern: index 0 (red), 1 (orange), 2 (white)
+                    when (index % 3) {
+                        0 -> SegmentFill.Solid(Color(0xFFFF2400))
+                        1 -> SegmentFill.Solid(Color(0xFFFFA500))
+                        else -> SegmentFill.Solid(Color(0xFFFFFFFF))
+                    }
+                }
+            }
             FortuneSegment(
                 reward = reward,
                 label = generateLabel(reward),
-                fill = fills[index % fills.size]
+                fill = fill
             )
         }
     }
@@ -129,30 +127,31 @@ fun FortuneScreen(
                     val cx = size.width / 2f
                     val cy = size.height / 2f
                     val outerR = (size.minDimension / 2f) - 24.dp.toPx()
-                    val sweep = 360f / segments.size
+                    if (segments.isNotEmpty()) {
+                        val sweep = 360f / segments.size
 
-                    rotate(rotation.value, pivot = Offset(cx, cy)) {
-                        segments.forEachIndexed { i, seg ->
-                            val start = i * sweep
-                            when (val fill = seg.fill) {
-                                is SegmentFill.Solid -> drawArc(
-                                    color = fill.color,
-                                    startAngle = start,
-                                    sweepAngle = sweep,
-                                    useCenter = true,
-                                    topLeft = Offset(cx - outerR, cy - outerR),
-                                    size = Size(outerR * 2, outerR * 2)
-                                )
-                                is SegmentFill.Gradient -> drawArc(
-                                    brush = fill.brush,
-                                    startAngle = start,
-                                    sweepAngle = sweep,
-                                    useCenter = true,
-                                    topLeft = Offset(cx - outerR, cy - outerR),
-                                    size = Size(outerR * 2, outerR * 2)
-                                )
+                        rotate(rotation.value, pivot = Offset(cx, cy)) {
+                            segments.forEachIndexed { i, seg ->
+                                val start = i * sweep
+                                when (val fill = seg.fill) {
+                                    is SegmentFill.Solid -> drawArc(
+                                        color = fill.color,
+                                        startAngle = start,
+                                        sweepAngle = sweep,
+                                        useCenter = true,
+                                        topLeft = Offset(cx - outerR, cy - outerR),
+                                        size = Size(outerR * 2, outerR * 2)
+                                    )
+                                    is SegmentFill.Gradient -> drawArc(
+                                        brush = fill.brush,
+                                        startAngle = start,
+                                        sweepAngle = sweep,
+                                        useCenter = true,
+                                        topLeft = Offset(cx - outerR, cy - outerR),
+                                        size = Size(outerR * 2, outerR * 2)
+                                    )
+                                }
                             }
-                        }
 
                         segments.forEachIndexed { i, seg ->
                             val startAngle = i * sweep
@@ -217,6 +216,8 @@ fun FortuneScreen(
                         drawCircle(color = Color(0xFFFFD700), radius = outerR * 0.18f, style = Stroke(width = 4.dp.toPx()))
                         drawCircle(color = Color(0xFFFFC107), radius = outerR * 0.08f)
                     }
+                    // Close the `if (segments.isNotEmpty())`
+                    }
 
                     val pointerPath = Path().apply {
                         moveTo(cx - 18.dp.toPx(), cy - outerR - 16.dp.toPx())
@@ -232,46 +233,47 @@ fun FortuneScreen(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            Button(
-                onClick = {
-                    if (!isSpinning && !hasSpun) {
-                        isSpinning = true
-                        scope.launch {
-                            spinWheel(viewModel, rotation, segments) { reward ->
-                                rewardPopup = reward
-                                showPopup = true
-                                isSpinning = false
-                                hasSpun = true
-                                delay(2500)
-                                onDismiss()
+                Button(
+                    onClick = {
+                        if (!isSpinning && !hasSpun && segments.isNotEmpty()) {
+                            isSpinning = true
+                            scope.launch {
+                                spinWheel(viewModel, rotation, segments) { reward ->
+                                    rewardPopup = reward
+                                    showPopup = true
+                                    isSpinning = false
+                                    hasSpun = true
+                                    delay(2500)
+                                    onDismiss()
+                                }
                             }
                         }
-                    }
-                },
-                modifier = Modifier
-                    .height(64.dp)
-                    .fillMaxWidth(0.8f),
-                shape = CircleShape,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = when {
-                        hasSpun -> Color(0xFF388E3C)  // green = done!
-                        isSpinning -> Color.Gray
-                        else -> Color(0xFFD77A0B)
-                    }
-                ),
-                enabled = !isSpinning && !hasSpun
-            ) {
-                Text(
-                    text = when {
-                        hasSpun -> "DONE ✓"
-                        isSpinning -> "SPINNING..."
-                        else -> "SPIN!"
                     },
-                    fontWeight = FontWeight.Black,
-                    fontSize = 20.sp,
-                    color = Color.White
-                )
-            }
+                    modifier = Modifier
+                        .height(64.dp)
+                        .fillMaxWidth(0.8f),
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = when {
+                            hasSpun -> Color(0xFF388E3C)  // green = done!
+                            isSpinning || segments.isEmpty() -> Color.Gray
+                            else -> Color(0xFFD77A0B)
+                        }
+                    ),
+                    enabled = !isSpinning && !hasSpun && segments.isNotEmpty()
+                ) {
+                    Text(
+                        text = when {
+                            segments.isEmpty() -> "LOADING..."
+                            hasSpun -> "DONE ✓"
+                            isSpinning -> "SPINNING..."
+                            else -> "SPIN!"
+                        },
+                        fontWeight = FontWeight.Black,
+                        fontSize = 20.sp,
+                        color = Color.White
+                    )
+                }
 
             Spacer(modifier = Modifier.height(32.dp))
         }

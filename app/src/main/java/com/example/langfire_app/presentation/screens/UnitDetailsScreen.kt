@@ -17,6 +17,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -76,7 +79,7 @@ fun UnitDetailsScreen(
                         }
                     }
                     
-                    items(uiState.words, key = { it.wordId }) { wordItem ->
+                    items(uiState.words) { wordItem ->
                         WordItemCard(
                             wordItem = wordItem,
                             onAlreadyKnow = { viewModel.markWord(wordItem.wordId, 1.0f) },
@@ -229,24 +232,45 @@ fun WordItemCard(
             Box(
                 modifier = Modifier
                     .weight(0.5f)
-                    .fillMaxHeight(),
+                    .fillMaxHeight()
+                    .padding(horizontal = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    var wordFontSize by remember { mutableStateOf(22.sp) }
                     Text(
                         text = wordItem.word,
                         style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.ExtraBold
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = wordFontSize,
+                            lineHeight = wordFontSize * 1.2f
                         ),
                         color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        onTextLayout = { textLayoutResult ->
+                            if (textLayoutResult.hasVisualOverflow && wordFontSize > 10.sp) {
+                                wordFontSize *= 0.9f
+                            }
+                        }
                     )
                     Spacer(modifier = Modifier.height(4.dp))
+                    
+                    var translationFontSize by remember { mutableStateOf(14.sp) }
                     Text(
                         text = wordItem.translation,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontSize = translationFontSize,
+                            lineHeight = translationFontSize * 1.2f
+                        ),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        onTextLayout = { textLayoutResult ->
+                            if (textLayoutResult.hasVisualOverflow && translationFontSize > 8.sp) {
+                                translationFontSize *= 0.9f
+                            }
+                        }
                     )
                 }
             }
