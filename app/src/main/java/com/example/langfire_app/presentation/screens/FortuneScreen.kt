@@ -43,6 +43,7 @@ import com.example.langfire_app.domain.model.FortuneReward
 import com.example.langfire_app.presentation.viewmodels.FortuneViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalContext
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -58,6 +59,7 @@ fun FortuneScreen(
     var showPopup by remember { mutableStateOf(false) }
     val rotation = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     val availableRewards by viewModel.availableRewards.collectAsState()
 
@@ -112,6 +114,7 @@ fun FortuneScreen(
                                     isSpinning = true
                                     scope.launch {
                                         spinWheel(viewModel, rotation, segments) { reward ->
+                                            playRawSound(context, "win")
                                             rewardPopup = reward
                                             showPopup = true
                                             isSpinning = false
@@ -239,6 +242,7 @@ fun FortuneScreen(
                             isSpinning = true
                             scope.launch {
                                 spinWheel(viewModel, rotation, segments) { reward ->
+                                    playRawSound(context, "win")
                                     rewardPopup = reward
                                     showPopup = true
                                     isSpinning = false

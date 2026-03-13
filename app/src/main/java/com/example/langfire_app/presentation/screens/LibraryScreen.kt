@@ -45,6 +45,7 @@ fun LibraryScreen(
     onLibraryClick: () -> Unit = {},
 ) {
     val sections by viewModel.state.collectAsState()
+    val courseInfo by viewModel.courseInfo.collectAsState()
 
     LaunchedEffect(courseId) {
         viewModel.loadLibrary(courseId)
@@ -70,6 +71,8 @@ fun LibraryScreen(
             // ── Header ──────────────────────────────────────────────
             item {
                 LibraryHeader(
+                    courseFlag = courseInfo?.icon ?: "🌐",
+                    courseName = courseInfo?.name ?: "Course",
                     totalUnits = sections.sumOf { it.units.size },
                     completedUnits = sections.sumOf { s -> s.units.count { it.isCompleted } }
                 )
@@ -98,6 +101,8 @@ fun LibraryScreen(
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun LibraryHeader(
+    courseFlag: String,
+    courseName: String,
     totalUnits: Int,
     completedUnits: Int
 ) {
@@ -153,7 +158,7 @@ private fun LibraryHeader(
                     Text(
                         text = "Library",
                         style = MaterialTheme.typography.headlineSmall.copy(
-                            fontWeight = FontWeight.ExtraBold
+                            fontWeight = FontWeight.Black,
                         ),
                         color = MaterialTheme.colorScheme.onBackground
                     )
@@ -162,6 +167,29 @@ private fun LibraryHeader(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                // NEW: Course Badge
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(courseFlag, fontSize = 16.sp)
+                        Text(
+                            text = courseName.uppercase(),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
                 }
             }
 
@@ -589,7 +617,7 @@ fun UnitCard(
                             fontSize = 11.sp
                         )
                         Text(
-                            text = "words",
+                            text = "learned words",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 10.sp

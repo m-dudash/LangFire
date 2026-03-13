@@ -26,7 +26,7 @@ class FortuneWheelMechanic @Inject constructor(
     suspend fun getAvailableRewards(profileId: Int): List<FortuneReward> {
         val hasUnique = achievementRepository
             .getAchievementsByType(profileId, UNIQUE_FORTUNE_ACHIEVEMENT_TYPE)
-            .isNotEmpty()
+            .any { it.unlocked }
 
         val profile = profileRepository.getProfileById(profileId)
         val canReceiveFreeze = (profile?.streakFreezes ?: 0) < MAX_FREEZES
@@ -69,7 +69,7 @@ class FortuneWheelMechanic @Inject constructor(
 
         val hasUnique = achievementRepository
             .getAchievementsByType(profileId, UNIQUE_FORTUNE_ACHIEVEMENT_TYPE)
-            .isNotEmpty()
+            .any { it.unlocked }
 
         val profile = profileRepository.getProfileById(profileId)
         val canReceiveFreeze = (profile?.streakFreezes ?: 0) < MAX_FREEZES

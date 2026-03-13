@@ -213,6 +213,20 @@ private fun SessionStudyScreen(
     viewModel: LearnViewModel
 ) {
     val exercise = state.currentExercise ?: return
+    val context = LocalContext.current
+
+    LaunchedEffect(state.cardPhase) {
+        if (state.cardPhase == CardPhase.REVEALED) {
+            val ex = state.currentExercise
+            if (ex != null) {
+                if (state.isTypeCorrect != null) {
+                    playRawSound(context, if (state.isTypeCorrect == true) "correct" else "incorrect")
+                } else if (state.selectedWordId != null) {
+                    playRawSound(context, if (state.selectedWordId == ex.word.wordId) "correct" else "incorrect")
+                }
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -323,6 +337,7 @@ private fun SessionStudyScreen(
 // 1. Flashcard
 @Composable
 private fun FlashcardExercise(state: LearnUiState, viewModel: LearnViewModel, exercise: ExerciseItem, showNativeFirst: Boolean) {
+    val context = LocalContext.current
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         FlipCard(
             item        = exercise.word,
@@ -353,9 +368,9 @@ private fun FlashcardExercise(state: LearnUiState, viewModel: LearnViewModel, ex
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        SrsButton(Icons.Default.Close, "Forgot", Color(0xFFF44336), Color(0xFFFFEBEE)) { viewModel.answer(SrsEngine.Quality.FORGOT) }
-                        SrsButton(Icons.Default.Done, "Got It", EmeraldGreen, Color(0xFFE8F5E9)) { viewModel.answer(SrsEngine.Quality.GOOD) }
-                        SrsButton(Icons.Default.Star, "Easy", GoldXP, Color(0xFFFFF8E1)) { viewModel.answer(SrsEngine.Quality.EASY) }
+                        SrsButton(Icons.Default.Close, "Forgot", Color(0xFFF44336), Color(0xFFFFEBEE)) { playRawSound(context, "incorrect"); viewModel.answer(SrsEngine.Quality.FORGOT) }
+                        SrsButton(Icons.Default.Done, "Got It", EmeraldGreen, Color(0xFFE8F5E9)) { playRawSound(context, "correct"); viewModel.answer(SrsEngine.Quality.GOOD) }
+                        SrsButton(Icons.Default.Star, "Easy", GoldXP, Color(0xFFFFF8E1)) { playRawSound(context, "correct"); viewModel.answer(SrsEngine.Quality.EASY) }
                     }
                 }
             }
@@ -406,9 +421,9 @@ private fun ListeningFlipExercise(state: LearnUiState, viewModel: LearnViewModel
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    SrsButton(Icons.Default.Close, "Forgot", Color(0xFFF44336), Color(0xFFFFEBEE)) { viewModel.answer(SrsEngine.Quality.FORGOT) }
-                    SrsButton(Icons.Default.Done, "Got It", EmeraldGreen, Color(0xFFE8F5E9)) { viewModel.answer(SrsEngine.Quality.GOOD) }
-                    SrsButton(Icons.Default.Star, "Easy", GoldXP, Color(0xFFFFF8E1)) { viewModel.answer(SrsEngine.Quality.EASY) }
+                    SrsButton(Icons.Default.Close, "Forgot", Color(0xFFF44336), Color(0xFFFFEBEE)) { playRawSound(context, "incorrect"); viewModel.answer(SrsEngine.Quality.FORGOT) }
+                    SrsButton(Icons.Default.Done, "Got It", EmeraldGreen, Color(0xFFE8F5E9)) { playRawSound(context, "correct"); viewModel.answer(SrsEngine.Quality.GOOD) }
+                    SrsButton(Icons.Default.Star, "Easy", GoldXP, Color(0xFFFFF8E1)) { playRawSound(context, "correct"); viewModel.answer(SrsEngine.Quality.EASY) }
                 }
             }
 
@@ -672,7 +687,9 @@ private fun MatchingExercise(state: LearnUiState, viewModel: LearnViewModel, exe
     var matchedIds by remember { mutableStateOf(setOf<Int>()) }
     var errorPair by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
 
+    // Intercept back action to optionally show warning
     LaunchedEffect(selectedWordId, selectedTransId) {
         if (selectedWordId != null && selectedTransId != null) {
             val wid = selectedWordId!!
@@ -680,6 +697,7 @@ private fun MatchingExercise(state: LearnUiState, viewModel: LearnViewModel, exe
             
             if (wid == tid) {
                 // Correct match
+                playRawSound(context, "correct")
                 matchedIds = matchedIds + wid
                 pairsLeft = pairsLeft.filter { it.wordId != wid }
                 
@@ -689,6 +707,7 @@ private fun MatchingExercise(state: LearnUiState, viewModel: LearnViewModel, exe
                 }
             } else {
                 // Wrong match
+                playRawSound(context, "incorrect")
                 errors++
                 errorPair = wid to tid
                 coroutineScope.launch {
@@ -856,7 +875,7 @@ private fun FlipCard(
                         
                         // Main Word Content
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (!item.article.isNullOrBlank() && !blurContent && !showNativeFirst) {
+                            if (!item.article.isNullOrBlank() && item.article != "null" && !blurContent && !showNativeFirst) {
                                 Text(
                                     text = "${item.article} ",
                                     style = MaterialTheme.typography.displaySmall,
@@ -873,7 +892,7 @@ private fun FlipCard(
                             )
                         }
 
-                        if (!item.plural.isNullOrBlank() && !blurContent && !showNativeFirst) {
+                        if (!item.plural.isNullOrBlank() && item.plural != "null" && !blurContent && !showNativeFirst) {
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
                                 text = "pl. ${item.plural}",
@@ -883,7 +902,7 @@ private fun FlipCard(
                             )
                         }
                         
-                        if (!item.exampleSentence.isNullOrBlank() && !blurContent && !showNativeFirst) {
+                        if (!item.exampleSentence.isNullOrBlank() && item.exampleSentence != "null" && !blurContent && !showNativeFirst) {
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
                                 text = "\"${item.exampleSentence}\"",
@@ -930,14 +949,6 @@ private fun FlipCard(
                         Spacer(modifier = Modifier.height(32.dp))
                         Surface(shape = RoundedCornerShape(16.dp), color = Color.White.copy(alpha = 0.15f)) {
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
-                                if (!item.article.isNullOrBlank() && showNativeFirst) {
-                                    Text(
-                                        text = "${item.article} ",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Normal,
-                                        color = Color.White.copy(alpha = 0.7f)
-                                    )
-                                }
                                 Text(
                                     text = backSubWord,
                                     style = MaterialTheme.typography.titleMedium,
@@ -1207,6 +1218,19 @@ fun playTestSound(context: android.content.Context) {
         val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
         val r = RingtoneManager.getRingtone(context, uri)
         r.play()
+    } catch (e: Exception) {
+        // Ignored
+    }
+}
+
+fun playRawSound(context: android.content.Context, soundName: String) {
+    try {
+        val resId = context.resources.getIdentifier(soundName, "raw", context.packageName)
+        if (resId != 0) {
+            val mediaPlayer = android.media.MediaPlayer.create(context, resId)
+            mediaPlayer?.setOnCompletionListener { it.release() }
+            mediaPlayer?.start()
+        }
     } catch (e: Exception) {
         // Ignored
     }

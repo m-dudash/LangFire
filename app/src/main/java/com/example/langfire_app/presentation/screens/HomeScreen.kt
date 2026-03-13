@@ -219,7 +219,8 @@ fun HomeScreen(
             StatsWordsBottomSheet(
                 category  = state.activeStatCategory!!,
                 words     = state.statSheetWords,
-                isLoading = state.isStatSheetLoading
+                isLoading = state.isStatSheetLoading,
+                flag      = state.languageFlag
             )
         }
     }
@@ -1011,7 +1012,8 @@ private fun SmallProgressRing(
 private fun StatsWordsBottomSheet(
     category: StatCategory,
     words: List<StatWordItem>,
-    isLoading: Boolean
+    isLoading: Boolean,
+    flag: String
 ) {
     val titleColor = when (category) {
         StatCategory.TO_LEARN  -> Color.Gray
@@ -1051,22 +1053,33 @@ private fun StatsWordsBottomSheet(
         // Header
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 16.dp)
         ) {
-            Text(text = emoji, fontSize = 26.sp)
-            Column {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    color = titleColor
-                )
-                Text(
-                    text = "${words.size} words",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(text = emoji, fontSize = 26.sp)
+                Column {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = titleColor
+                    )
+                    Text(
+                        text = "${words.size} words",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
+            
+            // NEW: Course flag on the opposite side
+            Text(
+                text = flag,
+                fontSize = 28.sp
+            )
         }
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
@@ -1210,6 +1223,7 @@ internal fun LangFireBottomBar(
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .navigationBarsPadding()
             .height(100.dp),
         contentAlignment = Alignment.BottomCenter
     ) {
@@ -1217,11 +1231,17 @@ internal fun LangFireBottomBar(
         NavigationBar(
             containerColor = MaterialTheme.colorScheme.surface,
             tonalElevation = 3.dp,
-            modifier = Modifier.align(Alignment.BottomCenter)
+            modifier = Modifier.align(Alignment.BottomCenter),
+            windowInsets = WindowInsets(0, 0, 0, 0)
         ) {
             NavigationBarItem(
                 selected = selected == NavTab.LIBRARY,
-                onClick = { selected = NavTab.LIBRARY; onLibraryClick() },
+                onClick = { 
+                    if (initialSelected != NavTab.LIBRARY) { 
+                        selected = NavTab.LIBRARY 
+                        onLibraryClick() 
+                    } 
+                },
                 icon = { Icon(Icons.Outlined.LibraryBooks, "Library") },
                 label = { Text("Library") },
                 colors = NavigationBarItemDefaults.colors(
@@ -1241,7 +1261,12 @@ internal fun LangFireBottomBar(
 
             NavigationBarItem(
                 selected = selected == NavTab.PROFILE,
-                onClick = { selected = NavTab.PROFILE; onProfileClick() },
+                onClick = { 
+                    if (initialSelected != NavTab.PROFILE) { 
+                        selected = NavTab.PROFILE 
+                        onProfileClick() 
+                    } 
+                },
                 icon = { Icon(Icons.Outlined.Person, "Profile") },
                 label = { Text("Profile") },
                 colors = NavigationBarItemDefaults.colors(
@@ -1259,8 +1284,10 @@ internal fun LangFireBottomBar(
                 .size(86.dp)
                 .pointerInput(Unit) {
                     detectTapGestures(onTap = {
-                        selected = NavTab.BURN
-                        onBurnClick()
+                        if (initialSelected != NavTab.BURN) {
+                            selected = NavTab.BURN
+                            onBurnClick()
+                        }
                     })
                 }
         ) {

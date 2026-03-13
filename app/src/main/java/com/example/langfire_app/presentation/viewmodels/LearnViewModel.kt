@@ -274,12 +274,13 @@ class LearnViewModel @Inject constructor(
             }
 
             _uiState.update {
+                val mixedExercises = exercises.shuffled(Random(System.currentTimeMillis())).take(20)
                 it.copy(
                     sessionPhase   = SessionPhase.INTRO,
-                    queue          = exercises.shuffled(Random(System.currentTimeMillis())),
+                    queue          = mixedExercises,
                     currentIndex   = 0,
                     cardPhase      = CardPhase.FRONT,
-                    totalInSession = exercises.size,
+                    totalInSession = mixedExercises.size,
                     correctCount   = 0,
                     forgotCount    = 0,
                     engineResult   = null
