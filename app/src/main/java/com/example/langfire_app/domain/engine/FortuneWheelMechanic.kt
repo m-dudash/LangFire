@@ -28,7 +28,10 @@ class FortuneWheelMechanic @Inject constructor(
             .getAchievementsByType(profileId, UNIQUE_FORTUNE_ACHIEVEMENT_TYPE)
             .isNotEmpty()
 
-        val baseRewards = listOf(
+        val profile = profileRepository.getProfileById(profileId)
+        val canReceiveFreeze = (profile?.streakFreezes ?: 0) < MAX_FREEZES
+
+        val baseRewards = mutableListOf(
             FortuneReward.Multiplier(2),
             FortuneReward.Multiplier(3),
             FortuneReward.Multiplier(5),
@@ -37,6 +40,7 @@ class FortuneWheelMechanic @Inject constructor(
             FortuneReward.Xp(500)
         )
 
+        if (canReceiveFreeze) baseRewards.add(FortuneReward.Freeze)
         return if (hasUnique) baseRewards else baseRewards + FortuneReward.UniqueAchievement
     }
 
@@ -47,6 +51,7 @@ class FortuneWheelMechanic @Inject constructor(
      * - Only one spin per calendar day is rewarded.
      * - Reward is picked via weighted random from a predefined table.
      * - A unique rare achievement can be won at most once ever.
+     * - A Freeze can only be won if the player has fewer than [MAX_FREEZES] freezes.
      *
      * @return [EngineResult] containing the chosen [FortuneReward].
      */
@@ -66,6 +71,9 @@ class FortuneWheelMechanic @Inject constructor(
             .getAchievementsByType(profileId, UNIQUE_FORTUNE_ACHIEVEMENT_TYPE)
             .isNotEmpty()
 
+        val profile = profileRepository.getProfileById(profileId)
+        val canReceiveFreeze = (profile?.streakFreezes ?: 0) < MAX_FREEZES
+
         val options = mutableListOf(
             RewardOption(FortuneReward.Multiplier(2), 20.0),
             RewardOption(FortuneReward.Multiplier(3), 12.0),
@@ -77,6 +85,9 @@ class FortuneWheelMechanic @Inject constructor(
 
         if (!hasUnique) {
             options.add(RewardOption(FortuneReward.UniqueAchievement, 0.2))
+        }
+        if (canReceiveFreeze) {
+            options.add(RewardOption(FortuneReward.Freeze, 8.0))
         }
 
         val reward = pickWeightedReward(options)
@@ -96,6 +107,9 @@ class FortuneWheelMechanic @Inject constructor(
                     profileId   = profileId
                 )
                 achievementRepository.saveAchievement(achievement)
+            }
+            FortuneReward.Freeze -> {
+                profileRepository.addFreeze(profileId)
             }
         }
 
@@ -131,5 +145,6 @@ class FortuneWheelMechanic @Inject constructor(
     companion object {
         const val UNIQUE_FORTUNE_ACHIEVEMENT_TYPE = "unique_fortune_reward"
         const val FORTUNE_MULTIPLIER_HOURS = 4L
+        const val MAX_FREEZES = 5
     }
 }

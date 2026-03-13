@@ -183,8 +183,11 @@ class GamificationEngine @Inject constructor(
     /**
      * Update the user's daily streak if applicable.
      *
-     * Uses IntervalRepetitiveRuleEvaluator to calculate the current streak
-     * based on streak-related behaviors, then updates profile.
+     * Logic:
+     * - Calculates current streak from behavior history.
+     * - If a day was MISSED and the user has streak freezes, one freeze is consumed
+     *   and the streak is maintained (not reset).
+     * - Awards a freeze every 10 streak days (if the user has < MAX_FREEZES).
      *
      * @return Pair(streakUpdated, newStreakDays)
      */
@@ -204,13 +207,31 @@ class GamificationEngine @Inject constructor(
             currentTimestamp  = behavior.timestamp
         )
 
-        if (currentStreak != profile.streakDays) {
+        // If currentConsecutive is 1 but we had a streak, it means we missed a day.
+        // If the player has a freeze, consume it and RECOVER the streak (old streak + 1).
+        val effectiveStreak = if (currentStreak == 1 && profile.streakDays > 0 && profile.streakFreezes > 0) {
+            profileRepository.consumeFreeze(behavior.profileId)
+            profile.streakDays + 1 // Add today to the preserved streak
+        } else {
+            currentStreak
+        }
+
+        // Award a freeze every 10 streak days (if below cap)
+        if (effectiveStreak > 0
+            && effectiveStreak % 10 == 0
+            && effectiveStreak != profile.streakDays  // only on the day it hits the milestone
+            && profile.streakFreezes < FortuneWheelMechanic.MAX_FREEZES
+        ) {
+            profileRepository.addFreeze(behavior.profileId)
+        }
+
+        if (effectiveStreak != profile.streakDays) {
             profileRepository.updateStreak(
                 profileId      = behavior.profileId,
-                streakDays     = currentStreak,
+                streakDays     = effectiveStreak,
                 lastActiveDate = behavior.timestamp
             )
-            return Pair(true, currentStreak)
+            return Pair(true, effectiveStreak)
         }
 
         return Pair(false, profile.streakDays)

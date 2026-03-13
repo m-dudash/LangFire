@@ -201,7 +201,7 @@ class DebugSeeder @Inject constructor(
     private suspend fun seedProfiles(): List<Int> {
         val now = System.currentTimeMillis()
         val profiles = listOf(
-            ProfileEntity(name = "Student", xp = 1350, streakDays = 7, lastActiveDate = now - DAY_MS),
+            ProfileEntity(name = "Student", xp = 1350, streakDays = 10, lastActiveDate = now - 2 * DAY_MS, streakFreezes = 1),
             ProfileEntity(name = "Explorer", xp = 420, streakDays = 2, lastActiveDate = now - 2 * DAY_MS),
             ProfileEntity(name = "Achiever", xp = 2200, streakDays = 14, lastActiveDate = now - DAY_MS / 2),
             ProfileEntity(name = "Tester", xp = 120, streakDays = 1, lastActiveDate = now - 3 * DAY_MS)
@@ -360,7 +360,7 @@ class DebugSeeder @Inject constructor(
 
     private companion object {
         const val DEBUG_SEED_KEY = "debug_seed_v1"
-        const val DEBUG_SEED_VERSION = "3"
+        const val DEBUG_SEED_VERSION = "4" // Bumped for freeze test
         const val WORDS_PER_COURSE = 60
         const val WORDS_PER_UNIT = 10
         const val WORDS_PER_LEVEL = 10

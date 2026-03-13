@@ -44,4 +44,12 @@ class ProfileRepositoryImpl @Inject constructor(
     override suspend fun clearXpMultiplier(profileId: Int) {
         profileDao.clearXpMultiplier(profileId)
     }
+
+    override suspend fun addFreeze(profileId: Int) {
+        profileDao.addFreeze(profileId)
+    }
+
+    override suspend fun consumeFreeze(profileId: Int) {
+        profileDao.consumeFreeze(profileId)
+    }
 }

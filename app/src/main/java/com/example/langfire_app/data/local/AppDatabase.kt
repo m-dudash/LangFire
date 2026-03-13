@@ -26,14 +26,15 @@ import com.example.langfire_app.data.local.entities.*
         AppSettingEntity::class,
         GenderEntity::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 7, to = 8),
         AutoMigration(from = 8, to = 9),
         AutoMigration(from = 9, to = 10),
         AutoMigration(from = 10, to = 11),
-        AutoMigration(from = 11, to = 12, spec = AppDatabase.DeleteSuperWinColumn::class)
+        AutoMigration(from = 11, to = 12, spec = AppDatabase.DeleteSuperWinColumn::class),
+        AutoMigration(from = 12, to = 13)
     ]
 )
 abstract class AppDatabase : RoomDatabase() {

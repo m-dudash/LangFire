@@ -353,6 +353,7 @@ private fun rewardText(reward: FortuneReward?): String {
         is FortuneReward.Xp -> "+${reward.amount} XP"
         is FortuneReward.Multiplier -> "${reward.multiplier}x Boost (4h)"
         FortuneReward.UniqueAchievement -> "Unique Profile Design"
+        FortuneReward.Freeze -> "Streak Freezer 🧊"
         null -> ""
     }
 }
@@ -362,6 +363,7 @@ private fun generateLabel(reward: FortuneReward): String {
         is FortuneReward.Xp -> "+${reward.amount} XP"
         is FortuneReward.Multiplier -> "${reward.multiplier}x BOOST"
         FortuneReward.UniqueAchievement -> "SUPER WIN"
+        FortuneReward.Freeze -> "FREEZE 🧊"
     }
 }
 
@@ -370,6 +372,7 @@ private fun sameReward(a: FortuneReward, b: FortuneReward): Boolean {
         a is FortuneReward.Xp && b is FortuneReward.Xp -> a.amount == b.amount
         a is FortuneReward.Multiplier && b is FortuneReward.Multiplier -> a.multiplier == b.multiplier
         a is FortuneReward.UniqueAchievement && b is FortuneReward.UniqueAchievement -> true
+        a is FortuneReward.Freeze && b is FortuneReward.Freeze -> true
         else -> false
     }
 }

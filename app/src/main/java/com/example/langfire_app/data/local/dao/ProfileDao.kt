@@ -40,4 +40,18 @@ interface ProfileDao {
 
     @Query("DELETE FROM profile WHERE id = :id")
     suspend fun deleteById(id: Int)
+
+    @Query("""
+        UPDATE profile 
+        SET streak_freezes = MIN(streak_freezes + 1, 5) 
+        WHERE id = :profileId
+    """)
+    suspend fun addFreeze(profileId: Int)
+
+    @Query("""
+        UPDATE profile 
+        SET streak_freezes = MAX(streak_freezes - 1, 0) 
+        WHERE id = :profileId
+    """)
+    suspend fun consumeFreeze(profileId: Int)
 }

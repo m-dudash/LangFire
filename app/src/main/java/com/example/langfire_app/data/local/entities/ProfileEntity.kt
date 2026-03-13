@@ -13,5 +13,6 @@ data class ProfileEntity(
     @ColumnInfo(name = "last_active_date") val lastActiveDate: Long,
     @ColumnInfo(name = "xp_multiplier") val xpMultiplier: Int = 1,
     @ColumnInfo(name = "xp_multiplier_expires_at") val xpMultiplierExpiresAt: Long? = null,
-    @ColumnInfo(name = "avatar_path") val avatarPath: String? = null
+    @ColumnInfo(name = "avatar_path") val avatarPath: String? = null,
+    @ColumnInfo(name = "streak_freezes", defaultValue = "0") val streakFreezes: Int = 0
 )

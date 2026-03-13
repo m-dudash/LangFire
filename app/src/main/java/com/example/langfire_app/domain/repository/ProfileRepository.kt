@@ -15,4 +15,6 @@ interface ProfileRepository {
     suspend fun updateStreak(profileId: Int, streakDays: Int, lastActiveDate: Long)
     suspend fun setXpMultiplier(profileId: Int, multiplier: Int, expiresAt: Long?)
     suspend fun clearXpMultiplier(profileId: Int)
+    suspend fun addFreeze(profileId: Int)
+    suspend fun consumeFreeze(profileId: Int)
 }

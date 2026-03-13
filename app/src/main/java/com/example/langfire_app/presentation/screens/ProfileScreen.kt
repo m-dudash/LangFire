@@ -440,6 +440,14 @@ private fun ProfileHeroSection(profile: Profile, uiState: ProfileUiState, onUpda
                 modifier = Modifier.fillMaxWidth(),
                 contentAlignment = Alignment.Center
             ) {
+                // Freeze Counter (to the left of avatar, at same height as TRY button)
+                FreezeCounter(
+                    count = uiState.streakFreezes,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 20.dp)
+                )
+
                 // Circular "Try Super Win" preview button
                 if (!uiState.hasSuperWin) {
                     TrySuperWinButton(
@@ -621,6 +629,66 @@ private fun TrySuperWinButton(
                     ),
                     textAlign = TextAlign.Center,
                     lineHeight = 10.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FreezeCounter(count: Int, modifier: Modifier = Modifier) {
+    // Ice-blue color palette
+    val iceBlue = Color(0xFF4FC3F7)
+    val iceBlueDark = Color(0xFF0288D1)
+    val iceContainer = Color(0xFFE1F5FE)
+
+    // Logic for 0 state visuals
+    val isZero = count == 0
+    val activeIceBlue = if (isZero) Color.Gray.copy(alpha = 0.7f) else iceBlue
+    val activeIceBlueDark = if (isZero) Color.Gray else iceBlueDark
+    val activeIceContainer = if (isZero) Color.LightGray.copy(alpha = 0.5f) else iceContainer
+
+    // Subtle pulse animation (only if > 0)
+    val infiniteTransition = rememberInfiniteTransition(label = "freezePulse")
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = if (isZero) 0.3f else 0.4f,
+        targetValue = if (isZero) 0.3f else 0.9f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glowAlpha"
+    )
+
+    Box(
+        modifier = modifier.size(56.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        // Circular ice cube badge (Centered)
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            shape = CircleShape,
+            color = activeIceContainer,
+            border = BorderStroke(1.5.dp, activeIceBlue.copy(alpha = glowAlpha)),
+            shadowElevation = if (isZero) 0.dp else 4.dp
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "🧊", 
+                    fontSize = 18.sp,
+                    modifier = Modifier.graphicsLayer(alpha = if (isZero) 0.5f else 1f)
+                )
+                Text(
+                    text = "$count",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        color = activeIceBlueDark,
+                        fontSize = 14.sp
+                    )
                 )
             }
         }

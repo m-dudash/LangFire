@@ -25,8 +25,29 @@ import javax.inject.Singleton
 @Singleton
 class GamificationSeeder @Inject constructor(
     private val ruleRepository: RuleRepository,
-    private val achievementRepository: AchievementRepository
+    private val achievementRepository: AchievementRepository,
+    private val profileDao: com.example.langfire_app.data.local.dao.ProfileDao
 ) {
+
+    /**
+     * Test utility: Force-sets a profile into a state perfect for testing streak freezes.
+     * Profile will have:
+     * - 10 day streak
+     * - 1 freeze
+     * - Last activity 2 days ago (Gap found!)
+     */
+    suspend fun setupFreezeTest(profileId: Int) {
+        val now = System.currentTimeMillis()
+        val dayMs = 24 * 60 * 60 * 1000L
+        
+        val profile = profileDao.getById(profileId) ?: return
+        
+        profileDao.update(profile.copy(
+            streakDays = 10,
+            lastActiveDate = now - 2 * dayMs,
+            streakFreezes = 1
+        ))
+    }
 
     /**
      * Seed the database with default achievements and rules.
@@ -43,6 +64,9 @@ class GamificationSeeder @Inject constructor(
 
         val rules = createDefaultRules()
         ruleRepository.saveAllRules(rules)
+
+        // Setup test state for Freeze Bonus testing
+        setupFreezeTest(profileId)
     }
 
     private fun createDefaultAchievements(profileId: Int): List<Achievement> {

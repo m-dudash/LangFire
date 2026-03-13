@@ -94,7 +94,8 @@ class ProfileViewModel @Inject constructor(
                 toughestWord = stats.toughestWord,
                 accuracyPercent = accuracy,
                 courseProgress = stats.courseProgress,
-                hasSuperWin = hasSuperWin
+                hasSuperWin = hasSuperWin,
+                streakFreezes = profile.streakFreezes
             )
         }
     }
@@ -130,5 +131,6 @@ data class ProfileUiState(
     val toughestWord: String? = null,
     val accuracyPercent: Float = 0f,
     val courseProgress: List<CourseLevelInfo> = emptyList(),
-    val hasSuperWin: Boolean = false
+    val hasSuperWin: Boolean = false,
+    val streakFreezes: Int = 0
 )

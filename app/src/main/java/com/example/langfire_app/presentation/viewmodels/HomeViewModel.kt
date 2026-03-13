@@ -70,16 +70,27 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
 
-            val profile = getProfileUseCase.invoke()
+            var currentProfile = getProfileUseCase.invoke()
 
-            if (profile != null) {
+            if (currentProfile != null) {
+                // Dispatch 'app_open' behavior to trigger GamificationEngine's streak logic
+                // This ensures streak maintenance (and streak freeze usage) is calculated on startup
+                val engineResult = processBehaviorUseCase(
+                    Behavior(type = "app_open", profileId = currentProfile.id)
+                )
+
+                // If streak was updated or freeze was granted, we re-fetch to get fresh profile data
+                if (engineResult.streakUpdated || engineResult.freezeGranted) {
+                    currentProfile = getProfileUseCase.invoke() ?: currentProfile
+                }
+
                 _uiState.update {
                     it.copy(
                         hasActiveProfile = true,
-                        streakDays = profile.streakDays,
-                        xp = profile.xp,
-                        xpMultiplier = profile.xpMultiplier,
-                        xpMultiplierExpiresAt = profile.xpMultiplierExpiresAt,
+                        streakDays = currentProfile?.streakDays ?: 0,
+                        xp = currentProfile?.xp ?: 0,
+                        xpMultiplier = currentProfile?.xpMultiplier ?: 1,
+                        xpMultiplierExpiresAt = currentProfile?.xpMultiplierExpiresAt,
                     )
                 }
             } else {
@@ -113,9 +124,9 @@ class HomeViewModel @Inject constructor(
                 )
             }
 
-            if (profile != null && activeCourse != null) {
-                loadHomeCourseStats(profile.id, activeCourse.id)
-                checkFortuneAvailability(profile.id)
+            if (currentProfile != null && activeCourse != null) {
+                loadHomeCourseStats(currentProfile.id, activeCourse.id)
+                checkFortuneAvailability(currentProfile.id)
             }
         }
     }

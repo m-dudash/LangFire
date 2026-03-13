@@ -25,7 +25,8 @@ object EntityMappers {
         lastActiveDate = lastActiveDate,
         xpMultiplier = xpMultiplier,
         xpMultiplierExpiresAt = xpMultiplierExpiresAt,
-        avatarPath = avatarPath
+        avatarPath = avatarPath,
+        streakFreezes = streakFreezes
     )
 
     fun Profile.toEntity(): ProfileEntity = ProfileEntity(
@@ -36,7 +37,8 @@ object EntityMappers {
         lastActiveDate = lastActiveDate,
         xpMultiplier = xpMultiplier,
         xpMultiplierExpiresAt = xpMultiplierExpiresAt,
-        avatarPath = avatarPath
+        avatarPath = avatarPath,
+        streakFreezes = streakFreezes
     )
 
     // ──────────────────────────────────────────────
