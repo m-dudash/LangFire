@@ -1,0 +1,258 @@
+package com.example.langfire_app.presentation.viewmodels
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.langfire_app.domain.model.StatWord
+import com.example.langfire_app.domain.model.Course
+import com.example.langfire_app.domain.repository.CourseRepository
+import com.example.langfire_app.domain.repository.SettingsRepository
+import com.example.langfire_app.domain.repository.StatsRepository
+import com.example.langfire_app.domain.usecase.GetProfileUseCase
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+import com.example.langfire_app.domain.model.Behavior
+import com.example.langfire_app.domain.usecase.ProcessBehaviorUseCase
+
+enum class StatCategory { TO_LEARN, PRACTICED, LEARNED }
+
+
+@HiltViewModel
+class HomeViewModel @Inject constructor(
+    private val getProfileUseCase: GetProfileUseCase,
+    private val courseRepository: CourseRepository,
+    private val settingsRepository: SettingsRepository,
+    private val statsRepository: StatsRepository,
+    private val processBehaviorUseCase: ProcessBehaviorUseCase,
+    private val behaviorRepository: com.example.langfire_app.domain.repository.BehaviorRepository
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(HomeUiState())
+    val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    init {
+        loadData()
+    }
+
+    fun refresh() {
+        refreshSilently()
+    }
+
+    private fun refreshSilently() {
+        viewModelScope.launch {
+            val profile = getProfileUseCase.invoke() ?: return@launch
+            _uiState.update {
+                it.copy(
+                    xp                    = profile.xp,
+                    xpMultiplier          = profile.xpMultiplier,
+                    xpMultiplierExpiresAt = profile.xpMultiplierExpiresAt,
+                    streakDays            = profile.streakDays,
+                    avatarPath            = profile.avatarPath,
+                    isGoalReachedToday    = checkGoalReached(profile.id)
+                )
+            }
+            checkFortuneAvailability(profile.id)
+
+            val courseId = _uiState.value.activeCourseId ?: return@launch
+            loadHomeCourseStats(profile.id, courseId)
+        }
+    }
+
+    private fun loadData() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+
+            var currentProfile = getProfileUseCase.invoke()
+
+            if (currentProfile != null) {
+                val engineResult = processBehaviorUseCase(
+                    Behavior(type = "app_open", profileId = currentProfile.id)
+                )
+                if (engineResult.streakUpdated || engineResult.freezeGranted) {
+                    currentProfile = getProfileUseCase.invoke() ?: currentProfile
+                }
+
+                _uiState.update {
+                    it.copy(
+                        hasActiveProfile = true,
+                        streakDays = currentProfile?.streakDays ?: 0,
+                        xp = currentProfile?.xp ?: 0,
+                        xpMultiplier = currentProfile?.xpMultiplier ?: 1,
+                        xpMultiplierExpiresAt = currentProfile?.xpMultiplierExpiresAt,
+                        avatarPath = currentProfile?.avatarPath,
+                        isGoalReachedToday = if (currentProfile != null) checkGoalReached(currentProfile.id) else false
+                    )
+                }
+            } else {
+                _uiState.update { it.copy(hasActiveProfile = false) }
+            }
+
+            val allCourses   = courseRepository.getAllCourses()
+            val savedCourseId = settingsRepository.getCurrentCourseId()
+
+            val activeCourse: Course? = when {
+                savedCourseId != null ->
+                    courseRepository.getCourseById(savedCourseId)
+                        ?: allCourses.firstOrNull()
+                allCourses.isNotEmpty() -> {
+                    val first = allCourses.first()
+                    settingsRepository.setCurrentCourseId(first.id)
+                    first
+                }
+                else -> null
+            }
+
+            _uiState.update {
+                it.copy(
+                    isLoading        = false,
+                    availableCourses = allCourses,
+                    activeCourseId   = activeCourse?.id,
+                    languageName     = activeCourse?.name     ?: it.languageName,
+                    languageFlag     = activeCourse?.icon     ?: it.languageFlag,
+                    languageLevel    = it.languageLevel
+                )
+            }
+
+            if (currentProfile != null && activeCourse != null) {
+                loadHomeCourseStats(currentProfile.id, activeCourse.id)
+                checkFortuneAvailability(currentProfile.id)
+            }
+        }
+    }
+
+    private suspend fun checkFortuneAvailability(profileId: Int) {
+        val now = System.currentTimeMillis()
+        val startOfToday = (now / (24 * 60 * 60 * 1000L)) * (24 * 60 * 60 * 1000L)
+        val spins = behaviorRepository.getBehaviorsByTypeAfter(profileId, "fortune_spin", startOfToday)
+        _uiState.update { it.copy(isFortuneWheelAvailable = spins.isEmpty()) }
+    }
+
+    private suspend fun checkGoalReached(profileId: Int): Boolean {
+        val now = System.currentTimeMillis()
+        val startOfToday = (now / (24 * 60 * 60 * 1000L)) * (24 * 60 * 60 * 1000L)
+        val behaviors = behaviorRepository.getBehaviorsByTypeAfter(profileId, "daily_activity", startOfToday)
+        return behaviors.isNotEmpty()
+    }
+
+    fun selectCourse(courseId: Int) {
+        viewModelScope.launch {
+            settingsRepository.setCurrentCourseId(courseId)
+            val course = courseRepository.getCourseById(courseId)
+            _uiState.update {
+                it.copy(
+                    activeCourseId      = courseId,
+                    languageName        = course?.name ?: it.languageName,
+                    languageFlag        = course?.icon ?: it.languageFlag,
+                    showLanguagePicker  = false
+                )
+            }
+
+            val profile = getProfileUseCase.invoke()
+            if (profile != null) {
+                loadHomeCourseStats(profile.id, courseId)
+            }
+        }
+    }
+
+    fun showLanguagePicker() { _uiState.update { it.copy(showLanguagePicker = true)  } }
+    fun hideLanguagePicker() { _uiState.update { it.copy(showLanguagePicker = false) } }
+
+    fun onBurnClick() {
+    }
+
+    private suspend fun loadHomeCourseStats(profileId: Int,courseId: Int){
+        val stats = statsRepository.getHomeCourseStats(profileId, courseId)
+        _uiState.update {
+            it.copy(
+                toLearnCount = stats.toLearn,
+                practicedCount = stats.practiced,
+                learnedCount = stats.learned
+            )
+        }
+    }
+
+    fun spinFortuneWheel() {
+        viewModelScope.launch {
+            val profile = getProfileUseCase() ?: return@launch
+            val behavior = Behavior(
+                type = "fortune_spin",
+                profileId = profile.id
+            )
+            processBehaviorUseCase(behavior)
+
+            val updated = getProfileUseCase()
+            if (updated != null) {
+                _uiState.update {
+                    it.copy(
+                        xp = updated.xp,
+                        xpMultiplier = updated.xpMultiplier,
+                        xpMultiplierExpiresAt = updated.xpMultiplierExpiresAt,
+                        avatarPath = updated.avatarPath,
+                    )
+                }
+            }
+        }
+    }
+
+    fun showStatSheet(category: StatCategory) {
+        viewModelScope.launch {
+            val profile = getProfileUseCase() ?: return@launch
+            val courseId = _uiState.value.activeCourseId ?: return@launch
+
+            _uiState.update {
+                it.copy(
+                    activeStatCategory = category,
+                    isStatSheetLoading = true,
+                    statSheetWords = emptyList()
+                )
+            }
+
+            val words = when (category) {
+                StatCategory.TO_LEARN  -> statsRepository.getToLearnWords(profile.id, courseId)
+                StatCategory.PRACTICED -> statsRepository.getPracticedWords(profile.id, courseId)
+                StatCategory.LEARNED   -> statsRepository.getLearnedWords(profile.id, courseId)
+            }
+
+            _uiState.update {
+                it.copy(
+                    isStatSheetLoading = false,
+                    statSheetWords = words
+                )
+            }
+        }
+    }
+
+    fun hideStatSheet() {
+        _uiState.update { it.copy(activeStatCategory = null, statSheetWords = emptyList()) }
+    }
+}
+
+data class HomeUiState(
+    val isLoading: Boolean = true,
+    val hasActiveProfile: Boolean = false,
+    val streakDays: Int = 0,
+    val isGoalReachedToday: Boolean = false,
+    val xp: Int = 0,
+    val learnedWords: Int = 0,
+    val learnedWordsGoal: Int = 100,
+    val languageName: String = "Language",
+    val languageFlag: String = "🏳️",
+    val languageLevel: String = "A1",
+    val availableCourses: List<Course> = emptyList(),
+    val activeCourseId: Int? = null,
+    val showLanguagePicker: Boolean = false,
+    val toLearnCount: Int = 0,
+    val practicedCount: Int = 0,
+    val learnedCount: Int = 0,
+    val xpMultiplier: Int = 1,
+    val xpMultiplierExpiresAt: Long? = null,
+    val avatarPath: String? = null,
+    val isFortuneWheelAvailable: Boolean = true,
+    val activeStatCategory: StatCategory? = null,
+    val statSheetWords: List<StatWord> = emptyList(),
+    val isStatSheetLoading: Boolean = false,
+)

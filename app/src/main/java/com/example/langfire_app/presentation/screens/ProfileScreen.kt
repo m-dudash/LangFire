@@ -1,0 +1,1402 @@
+package com.example.langfire_app.presentation.screens
+
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import com.example.langfire_app.R
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.viewinterop.AndroidView
+import coil.compose.AsyncImage
+import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.langfire_app.domain.model.Achievement
+import com.example.langfire_app.domain.model.Course
+import com.example.langfire_app.domain.model.CourseLevelInfo
+import com.example.langfire_app.domain.model.Profile
+import androidx.compose.ui.window.Dialog
+import com.example.langfire_app.presentation.ui.theme.*
+import com.example.langfire_app.presentation.viewmodels.ProfileUiState
+import com.example.langfire_app.presentation.viewmodels.ProfileViewModel
+import com.example.langfire_app.presentation.components.DeveloperSignature
+import kotlin.math.cos
+import kotlin.math.sin
+import java.io.File
+import java.io.FileOutputStream
+import java.util.UUID
+
+private fun copyUriToAppStorage(context: android.content.Context, uri: Uri): String? {
+    return try {
+        val dir = File(context.filesDir, "avatars").also { it.mkdirs() }
+        val dest = File(dir, "avatar_${UUID.randomUUID()}.jpg")
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            FileOutputStream(dest).use { output -> input.copyTo(output) }
+        }
+        dest.absolutePath
+    } catch (e: Exception) {
+        null
+    }
+}
+
+@Composable
+fun ProfileScreen(
+    viewModel: ProfileViewModel = hiltViewModel(),
+    onLibraryClick: () -> Unit = {},
+    onBurnClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
+    onAchievementsClick: () -> Unit = {},
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        bottomBar = {
+            LangFireBottomBar(
+                onLibraryClick = onLibraryClick,
+                onBurnClick = onBurnClick,
+                onProfileClick = onProfileClick,
+                initialSelected = NavTab.PROFILE
+            )
+        }
+    ) { innerPadding ->
+        Box(modifier = Modifier.fillMaxSize().padding(top = innerPadding.calculateTopPadding())) {
+            ProfileContent(
+                uiState = uiState,
+                onUpdateProfile = viewModel::onUpdateProfile,
+                onUpdateGoal = viewModel::updateDailyGoal,
+                onAchievementsClick = onAchievementsClick,
+                bottomPadding = innerPadding.calculateBottomPadding()
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileContent(
+    uiState: ProfileUiState, 
+    onUpdateProfile: (String, String?) -> Unit,
+    onUpdateGoal: (Int) -> Unit,
+    onAchievementsClick: () -> Unit,
+    bottomPadding: androidx.compose.ui.unit.Dp = 0.dp
+) {
+    val profile = uiState.profile ?: return
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentPadding = PaddingValues(bottom = bottomPadding)
+    ) {
+        item { 
+            ProfileHeroSection(
+                profile = profile, 
+                uiState = uiState, 
+                onUpdateProfile = onUpdateProfile,
+                onUpdateGoal = onUpdateGoal
+            ) 
+        }
+        item { Spacer(Modifier.height(20.dp)) }
+        item { StatsSection(uiState = uiState) }
+        item { Spacer(Modifier.height(20.dp)) }
+        item { AccuracySection(uiState = uiState) }
+        item { Spacer(Modifier.height(20.dp)) }
+        item { AchievementsSection(achievements = uiState.achievements, onAchievementsClick = onAchievementsClick) }
+        item { Spacer(Modifier.height(20.dp)) }
+        item { CourseLanguageLevelsSection(courseProgress = uiState.courseProgress) }
+        item { DeveloperSignature() }
+    }
+}
+
+@Composable
+private fun ProfileHeroSection(
+    profile: Profile, 
+    uiState: ProfileUiState, 
+    onUpdateProfile: (String, String?) -> Unit,
+    onUpdateGoal: (Int) -> Unit
+) {
+    var showEditDialog by remember { mutableStateOf(false) }
+    var showGoalDialog by remember { mutableStateOf(false) }
+
+
+    val interactionSource = remember { MutableInteractionSource() }
+    val isSuperWinActive = uiState.hasSuperWin || interactionSource.collectIsPressedAsState().value
+
+    val infiniteTransition = rememberInfiniteTransition(label = "superWinFrame")
+    val frameRotation by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(3000, easing = LinearEasing)),
+        label = "rotation"
+    )
+
+    if (showGoalDialog) {
+        GoalSelectionDialog(
+            currentGoal = uiState.dailyWordGoal,
+            onDismiss = { showGoalDialog = false },
+            onSelect = { goal ->
+                onUpdateGoal(goal)
+                showGoalDialog = false
+            }
+        )
+    }
+
+    if (showEditDialog) {
+        EditProfileDialog(
+            currentName = profile.name,
+            currentAvatar = profile.avatarPath,
+            onDismiss = { showEditDialog = false },
+            onSave = { name, avatar ->
+                onUpdateProfile(name, avatar)
+                showEditDialog = false
+            }
+        )
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(280.dp)
+    ) {
+        if (isSuperWinActive) {
+            AsyncImage(
+                model = R.drawable.super_win_bg,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(280.dp)
+                    .drawWithContent {
+                        drawContent()
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, Color.White),
+                                startY = size.height * 0.65f,
+                                endY = size.height
+                            )
+                        )
+                    },
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                FireOrange.copy(alpha = 0.5f), 
+                                FireOrange.copy(alpha = 0.2f), 
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+        }
+
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                FreezeCounter(
+                    count = uiState.streakFreezes,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 20.dp)
+                )
+
+                if (!uiState.hasSuperWin) {
+                    TrySuperWinButton(
+                        interactionSource = interactionSource,
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = 20.dp)
+                    )
+                }
+
+                Box(
+                    modifier = Modifier.size(86.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isSuperWinActive) {
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            rotate(frameRotation) {
+                                drawCircle(
+                                    brush = Brush.sweepGradient(
+                                        listOf(GoldXP, FireOrange, FireOrangeDeep, GoldXP)
+                                    ),
+                                    style = Stroke(width = 5.dp.toPx())
+                                )
+                            }
+                        }
+                    }
+
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(76.dp)
+                            .clip(CircleShape)
+                            .background(
+                                brush = Brush.linearGradient(
+                                    if (isSuperWinActive) listOf(GoldXP, FireOrangeDeep)
+                                    else listOf(FireOrange, FireOrangeDeep)
+                                )
+                            )
+                            .clickable { showEditDialog = true }
+                    ) {
+                        if (!profile.avatarPath.isNullOrEmpty()) {
+                            AsyncImage(
+                                model = profile.avatarPath,
+                                contentDescription = "Profile Picture",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            val initials = profile.name
+                                .trim()
+                                .split(" ")
+                                .take(2)
+                                .joinToString("") { it.firstOrNull()?.uppercase() ?: "" }
+                                .ifEmpty { "?" }
+                            Text(
+                                text = initials,
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color.White
+                                )
+                            )
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(26.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit Profile",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (isSuperWinActive) FireOrange.copy(alpha = 0.15f) else Color.Transparent,
+                    border = if (isSuperWinActive) BorderStroke(1.5.dp, GoldXP.copy(alpha = 0.5f)) else null
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+
+                        Text(
+                            text = profile.name,
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.ExtraBold
+                            ),
+                            color = if (isSuperWinActive) DarkRed else MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                }
+                
+                Spacer(Modifier.height(8.dp))
+                
+                Spacer(Modifier.height(12.dp))
+                StreakProgressBar(
+                    streakDays = profile.streakDays,
+                    correctToday = uiState.correctToday,
+                    dailyGoal = uiState.dailyWordGoal,
+                    onGoalClick = { showGoalDialog = true }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrySuperWinButton(
+    interactionSource: MutableInteractionSource,
+    modifier: Modifier = Modifier
+) {
+    val pattern = "SUPER WIN ✦ "
+    val label = pattern.repeat(4)
+
+    Box(
+        modifier = modifier.size(92.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        AndroidView(
+            factory = { ctx ->
+                object : android.view.View(ctx) {
+                    override fun onDraw(canvas: android.graphics.Canvas) {
+                        val cx = width / 2f
+                        val cy = height / 2f
+                        val radius = cx - 9.dp.value * resources.displayMetrics.density
+
+                        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                            color = android.graphics.Color.argb(255, 255, 111, 0)
+                            textSize = 8.5f * resources.displayMetrics.density
+                            typeface = android.graphics.Typeface.create(
+                                android.graphics.Typeface.DEFAULT_BOLD,
+                                android.graphics.Typeface.BOLD
+                            )
+                            letterSpacing = 0.02f
+                        }
+
+                        val path = android.graphics.Path().apply {
+                            addCircle(cx, cy, radius, android.graphics.Path.Direction.CW)
+                        }
+
+                        canvas.rotate(-90f, cx, cy)
+                        canvas.drawTextOnPath(label, path, 0f, 0f, paint)
+                    }
+                }.apply { setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null) }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        Surface(
+            onClick = {},
+            modifier = Modifier.size(52.dp),
+            shape = CircleShape,
+            color = FireOrange,
+            shadowElevation = 4.dp,
+            interactionSource = interactionSource
+        ) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                Text(
+                    "HOLD\n&\nTRY",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        fontSize = 9.5.sp
+                    ),
+                    textAlign = TextAlign.Center,
+                    lineHeight = 10.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FreezeCounter(count: Int, modifier: Modifier = Modifier) {
+    val iceBlue = Color(0xFF4FC3F7)
+    val iceBlueDark = Color(0xFF0288D1)
+    val iceContainer = Color(0xFFE1F5FE)
+
+    val isZero = count == 0
+    val activeIceBlue = if (isZero) Color.Gray.copy(alpha = 0.7f) else iceBlue
+    val activeIceBlueDark = if (isZero) Color.Gray else iceBlueDark
+    val activeIceContainer = if (isZero) Color.LightGray.copy(alpha = 0.5f) else iceContainer
+
+    val infiniteTransition = rememberInfiniteTransition(label = "freezePulse")
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = if (isZero) 0.3f else 0.4f,
+        targetValue = if (isZero) 0.3f else 0.9f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glowAlpha"
+    )
+
+    Box(
+        modifier = modifier.size(56.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            shape = CircleShape,
+            color = activeIceContainer,
+            border = BorderStroke(1.5.dp, activeIceBlue.copy(alpha = glowAlpha)),
+            shadowElevation = if (isZero) 0.dp else 4.dp
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "🧊", 
+                    fontSize = 18.sp,
+                    modifier = Modifier.graphicsLayer(alpha = if (isZero) 0.5f else 1f)
+                )
+                Text(
+                    text = "$count",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        color = activeIceBlueDark,
+                        fontSize = 14.sp
+                    )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StreakProgressBar(
+    streakDays: Int,
+    correctToday: Int,
+    dailyGoal: Int,
+    onGoalClick: () -> Unit
+) {
+    val progress = if (dailyGoal > 0) (correctToday.toFloat() / dailyGoal).coerceIn(0f, 1f) else 0f
+    val isGoalMet = correctToday >= dailyGoal && dailyGoal > 0
+    val accentColor = if (streakDays > 0) FireOrange else Color.Gray
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = if (streakDays > 0) "🔥" else "💤", fontSize = 20.sp)
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "$streakDays",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Black,
+                        color = if (streakDays > 0) FireOrangeDeep else Color.Gray
+                    )
+                )
+            }
+
+            Text(
+                text = "$correctToday / $dailyGoal correct",
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = if (isGoalMet) EmeraldGreen else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(12.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable { onGoalClick() }
+        ) {
+            val progressWidth by animateFloatAsState(
+                targetValue = progress,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+                label = "streakProgress"
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(progressWidth)
+                    .fillMaxHeight()
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            if (isGoalMet) listOf(EmeraldGreen, Color(0xFF81C784))
+                            else listOf(FireOrange, FireOrangeDeep)
+                        )
+                    )
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        Text(
+            text = "Edit goal",
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.Bold,
+                color = FireOrangeDeep.copy(alpha = 0.7f)
+            ),
+            modifier = Modifier
+                .clickable { onGoalClick() }
+                .padding(horizontal = 12.dp, vertical = 4.dp)
+        )
+    }
+}
+
+@Composable
+private fun GoalSelectionDialog(
+    currentGoal: Int,
+    onDismiss: () -> Unit,
+    onSelect: (Int) -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            modifier = Modifier.fillMaxWidth().padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Daily Goal",
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black)
+                )
+                Text(
+                    text = "Correct answers needed to keep your streak alive",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                Profile.GOAL_TIERS.forEach { goal ->
+                    val isSelected = goal == currentGoal
+                    val label = when (goal) {
+                        Profile.GOAL_BEGINNER -> "🌱 Beginner"
+                        Profile.GOAL_MODERATE -> "📈 Progressor"
+                        Profile.GOAL_INTENSIVE -> "🔥 Intensive"
+                        Profile.GOAL_BURN -> "💀 BURN IT!"
+                        else -> "$goal Words"
+                    }
+
+                    Surface(
+                        onClick = { onSelect(goal) },
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        color = if (isSelected) FireOrange.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant,
+                        border = if (isSelected) BorderStroke(2.dp, FireOrange) else null
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Bold,
+                                    color = if (isSelected) FireOrangeDeep else MaterialTheme.colorScheme.onSurface
+                                )
+                            )
+                            Text(
+                                text = "$goal",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+                                color = if (isSelected) FireOrangeDeep else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                TextButton(onClick = onDismiss) {
+                    Text("Close", fontWeight = FontWeight.Bold, color = FireOrangeDeep)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatsSection(uiState: ProfileUiState) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        SectionLabel(text = "Statistics")
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            StatCard(
+                modifier = Modifier.weight(1f),
+                icon = "⚡",
+                label = "Total XP",
+                value = formatXpStat(uiState.profile?.xp ?: 0),
+                accentColor = GoldXP,
+                containerColor = GoldContainer
+            )
+            StatCard(
+                modifier = Modifier.weight(1f),
+                icon = "📚",
+                label = "Words Learned",
+                value = "${uiState.wordsLearned}",
+                accentColor = EmeraldGreen,
+                containerColor = EmeraldContainer
+            )
+        }
+
+        uiState.toughestWord?.let { ToughestWordCard(word = it) }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            StatCard(
+                modifier = Modifier.weight(1f),
+                icon = "✅",
+                label = "Correct",
+                value = "${uiState.totalCorrect}",
+                accentColor = EmeraldGreen,
+                containerColor = EmeraldContainer
+            )
+            StatCard(
+                modifier = Modifier.weight(1f),
+                icon = "❌",
+                label = "Errors",
+                value = "${uiState.totalErrors}",
+                accentColor = Color(0xFFD32F2F),
+                containerColor = Color(0xFFFFCDD2)
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatCard(
+    modifier: Modifier = Modifier,
+    icon: String,
+    label: String,
+    value: String,
+    accentColor: Color,
+    containerColor: Color
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(text = icon, fontSize = 24.sp)
+            Text(
+                text = value,
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontWeight = FontWeight.ExtraBold,
+                    color = accentColor
+                )
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                color = accentColor.copy(alpha = 0.75f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ToughestWordCard(word: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = FireContainer),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(text = "😤", fontSize = 28.sp)
+            Column {
+                Text(
+                    text = "Toughest Word to Learn",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = OnFireContainer.copy(alpha = 0.65f)
+                )
+                Text(
+                    text = word,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = OnFireContainer
+                    )
+                )
+            }
+        }
+    }
+}
+
+private fun formatXpStat(xp: Int): String = when {
+    xp >= 1_000_000 -> "${xp / 1_000_000}M"
+    xp >= 1000 -> {
+        val k = xp / 1000
+        val r = (xp % 1000) / 100
+        if (r == 0) "${k}K" else "${k}.${r}K"
+    }
+    else -> "$xp"
+}
+
+@Composable
+private fun AccuracySection(uiState: ProfileUiState) {
+    val accuracy = uiState.accuracyPercent
+    val animatedProgress by animateFloatAsState(
+        targetValue = (accuracy / 100f).coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 1100, easing = FastOutSlowInEasing),
+        label = "accuracy_progress"
+    )
+
+    val accentColor = when {
+        accuracy >= 80f -> EmeraldGreen
+        accuracy >= 50f -> GoldXP
+        else            -> Color(0xFFD32F2F)
+    }
+    val barColors = when {
+        accuracy >= 80f -> listOf(Color(0xFF66BB6A), EmeraldGreen)
+        accuracy >= 50f -> listOf(GoldXP, FireOrange)
+        else            -> listOf(Color(0xFFEF9A9A), Color(0xFFD32F2F))
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Accuracy Rate",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "${accuracy.toInt()}%",
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        color = accentColor
+                    )
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(14.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(animatedProgress)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(50))
+                        .background(Brush.horizontalGradient(barColors))
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "0%",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                )
+                Text(
+                    text = "100%",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AchievementsSection(achievements: List<Achievement>, onAchievementsClick: () -> Unit) {
+    var selectedAchievement by remember { mutableStateOf<Achievement?>(null) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            SectionLabel(text = "Achievements")
+            if (achievements.isNotEmpty()) {
+                Surface(
+                    onClick = onAchievementsClick,
+                    shape = RoundedCornerShape(12.dp),
+                    color = FireOrange.copy(alpha = 0.10f),
+                    border = BorderStroke(1.dp, FireOrange.copy(alpha = 0.35f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.GridView,
+                            contentDescription = "View all achievements",
+                            tint = FireOrangeDeep,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = "View All",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = FireOrangeDeep
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        if (achievements.isEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("🏆", fontSize = 28.sp)
+                    Text(
+                        text = "Keep learning to unlock achievements!",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        } else {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(end = 16.dp)
+            ) {
+                items(achievements) { achievement ->
+                    AchievementBadge(achievement = achievement) { selectedAchievement = it }
+                }
+            }
+        }
+    }
+
+    selectedAchievement?.let { achievement ->
+        AchievementDialog(
+            achievement = achievement,
+            onDismiss = { selectedAchievement = null }
+        )
+    }
+}
+
+@Composable
+private fun AchievementBadge(achievement: Achievement, onClick: (Achievement) -> Unit) {
+    val isUnlocked = achievement.unlocked
+    val bgColor    = if (isUnlocked) FortuneContainer
+                     else MaterialTheme.colorScheme.surfaceVariant
+
+    Card(
+        onClick = { onClick(achievement) },
+        shape  = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = bgColor),
+        border = if (isUnlocked)
+            BorderStroke(1.5.dp, FortunePurple.copy(alpha = 0.55f))
+        else null,
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 0.dp
+        ),
+        modifier = Modifier.width(140.dp).height(160.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(12.dp)
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val titleName = achievement.title.lowercase().replace(" ", "_").replace(Regex("[^a-z0-9_]"), "")
+            val imageName = "ach_$titleName"
+            val imageResId = remember(imageName) {
+                context.resources.getIdentifier(imageName, "drawable", context.packageName)
+            }
+            
+            if (imageResId != 0) {
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(id = imageResId),
+                    contentDescription = achievement.title,
+                    modifier = Modifier
+                        .size(96.dp)
+                        .graphicsLayer { alpha = if (isUnlocked) 1f else 0.5f },
+                    contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                )
+            } else {
+                Text(
+                    text = achievement.icon.ifEmpty { "🏅" },
+                    fontSize = 60.sp,
+                    modifier = Modifier.graphicsLayer {
+                        alpha = if (isUnlocked) 1f else 0.5f
+                    }
+                )
+            }
+            Text(
+                text  = achievement.title.ifEmpty { achievement.type },
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isUnlocked)
+                        FortunePurple
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                ),
+                textAlign = TextAlign.Center,
+                maxLines  = 2,
+                overflow  = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun AchievementDialog(achievement: Achievement, onDismiss: () -> Unit) {
+    val isUnlocked = achievement.unlocked
+    val buttonColor = if (isUnlocked) FireOrange else Color.Gray.copy(alpha = 0.8f)
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(160.dp)) {
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    val titleName = achievement.title.lowercase().replace(" ", "_").replace(Regex("[^a-z0-9_]"), "")
+                    val imageName = "ach_$titleName"
+                    val imageResId = remember(imageName) {
+                        context.resources.getIdentifier(imageName, "drawable", context.packageName)
+                    }
+                    
+                    if (imageResId != 0) {
+                        androidx.compose.foundation.Image(
+                            painter = androidx.compose.ui.res.painterResource(id = imageResId),
+                            contentDescription = achievement.title,
+                            modifier = Modifier
+                                .size(160.dp)
+                                .graphicsLayer { alpha = if (isUnlocked) 1f else 0.5f },
+                            contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                        )
+                    } else {
+                        Text(
+                            achievement.icon.ifEmpty { "🏆" },
+                            fontSize = 80.sp,
+                            modifier = Modifier.graphicsLayer {
+                                alpha = if (isUnlocked) 1f else 0.5f
+                            }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = achievement.title.ifEmpty { achievement.type },
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center
+                )
+                if (!achievement.description.isNullOrEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = achievement.description,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text("OK", fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CourseLanguageLevelsSection(courseProgress: List<CourseLevelInfo>) {
+    if (courseProgress.isEmpty()) return
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        SectionLabel(text = "Language Levels")
+        courseProgress.forEach { info -> CourseLevelCard(info = info) }
+    }
+}
+
+@Composable
+private fun CourseLevelCard(info: CourseLevelInfo) {
+    val isComplete  = info.targetLevel == null
+    val progress    = if (info.totalWordsInTarget > 0)
+        info.wordsLearnedInTarget.toFloat() / info.totalWordsInTarget
+    else if (isComplete) 1f else 0f
+
+    val animatedProgress by animateFloatAsState(
+        targetValue    = progress.coerceIn(0f, 1f),
+        animationSpec  = tween(1000, easing = FastOutSlowInEasing),
+        label          = "level_progress"
+    )
+
+    val achievedGradient = profileLevelGradient(info.achievedLevel ?: "")
+    val targetGradient   = profileLevelGradient(info.targetLevel   ?: info.achievedLevel ?: "")
+
+    Card(
+        modifier  = Modifier.fillMaxWidth(),
+        shape     = RoundedCornerShape(20.dp),
+        colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(
+                            if (isComplete) targetGradient
+                            else achievedGradient.takeIf { info.achievedLevel != null }
+                                ?: Brush.verticalGradient(listOf(
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                    MaterialTheme.colorScheme.surfaceVariant
+                                ))
+                        )
+                ) {
+                    Text(text = info.courseIcon, fontSize = 24.sp)
+                }
+                Column {
+                    Text(
+                        text  = info.courseName,
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text  = info.targetLang.uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        letterSpacing = 0.8.sp
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                LevelBadge(
+                    label    = info.achievedLevel ?: "--",
+                    gradient = achievedGradient,
+                    colored  = info.achievedLevel != null
+                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(10.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.18f))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(animatedProgress)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(50))
+                                .background(
+                                    if (isComplete)
+                                        targetGradient
+                                    else
+                                        achievedGradient.takeIf { info.achievedLevel != null }
+                                            ?: Brush.horizontalGradient(
+                                                listOf(FireOrange, FireOrangeDeep)
+                                            )
+                                )
+                        )
+                    }
+                    val subLabel = when {
+                        isComplete -> "All levels mastered 🏆"
+                        info.totalWordsInTarget == 0 -> "No words yet"
+                        else -> "${info.wordsLearnedInTarget} / ${info.totalWordsInTarget} words"
+                    }
+                    Text(
+                        text  = subLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+                    )
+                }
+                LevelBadge(
+                    label    = info.targetLevel ?: info.achievedLevel ?: "C2",
+                    gradient = targetGradient,
+                    colored  = isComplete
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LevelBadge(label: String, gradient: Brush, colored: Boolean) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(48.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (colored) gradient
+                else Brush.verticalGradient(
+                    listOf(Color(0xFFBDBDBD), Color(0xFF9E9E9E))
+                )
+            )
+    ) {
+        Text(
+            text  = label,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight    = FontWeight.Black,
+                color         = Color.White,
+                letterSpacing = (-0.5).sp
+            )
+        )
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text     = text,
+        style    = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+        color    = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 4.dp)
+    )
+}
+
+private fun profileLevelGradient(level: String): Brush = when (level.uppercase()) {
+    "A1" -> Brush.verticalGradient(listOf(Color(0xFF66BB6A), Color(0xFF2E7D32)))
+    "A2" -> Brush.verticalGradient(listOf(Color(0xFF26A69A), Color(0xFF00695C)))
+    "B1" -> Brush.verticalGradient(listOf(Color(0xFF42A5F5), Color(0xFF1565C0)))
+    "B2" -> Brush.verticalGradient(listOf(Color(0xFF7E57C2), Color(0xFF4527A0)))
+    "C1" -> Brush.verticalGradient(listOf(Color(0xFFAB47BC), Color(0xFF6A1B9A)))
+    "C2" -> Brush.linearGradient(listOf(Color(0xFFFFD740), Color(0xFFFF6F00)))
+    else -> Brush.verticalGradient(listOf(Color.Gray, Color.DarkGray))
+}
+
+@Composable
+fun EditProfileDialog(
+    currentName: String,
+    currentAvatar: String?,
+    onDismiss: () -> Unit,
+    onSave: (String, String?) -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var name by remember { mutableStateOf(currentName) }
+    var avatarPath by remember { mutableStateOf<String?>(currentAvatar) }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri ->
+            if (uri != null) {
+                val copied = copyUriToAppStorage(context, uri)
+                if (copied != null) avatarPath = copied
+            }
+        }
+    )
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.fillMaxWidth().padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Edit Profile",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable {
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (avatarPath != null) {
+                        AsyncImage(
+                            model = avatarPath,
+                            contentDescription = "Profile Picture",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Change Picture",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Spacer(modifier = Modifier.height(32.dp))
+                
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Cancel")
+                    }
+                    Button(
+                        onClick = { onSave(name, avatarPath) },
+                        enabled = name.isNotBlank(),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Text("Save")
+                    }
+                }
+            }
+        }
+    }
+}
